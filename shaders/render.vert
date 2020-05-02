@@ -13,7 +13,7 @@ layout(location = 2) in vec2 i_texture_coordinates;
 
 out VS_OUT
 {
-    vec3 color;
+    flat vec3 color;
     vec4 light_space_position;
 } vs_out;
 

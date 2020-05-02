@@ -95,7 +95,7 @@ namespace geom
 
 		/// Returns the total length of this curve (i.e. the sum of the lengths
 		/// of all of its segments).
-		float length() const
+		float perimeter() const
 		{
 			float length = 0.0f;
 
@@ -130,7 +130,7 @@ namespace geom
 				return vertices.back();
 			}
 
-			const auto desired_length = length() * t;
+			const auto desired_length = perimeter() * t;
 			auto traversed = 0.0f;
 			auto point = glm::vec3{ 10.0f, 0.0f, 0.0f };
 
@@ -151,11 +151,11 @@ namespace geom
 			return point;
 		}
 
-		PolygonalCurve refine(float minimum_segment_length) const
+		PolygonalCurve refine(float minimum_segment_length, bool keep_existing_points = true) const
 		{
 			auto refined = PolygonalCurve{};
 
-			float total_length = length();
+			float total_length = perimeter();
 			for (float f = 0; f <= total_length; f += minimum_segment_length)
 			{
 				float percent = f / total_length;

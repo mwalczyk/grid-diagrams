@@ -128,6 +128,8 @@ public:
 		rope{ curve },
 		anchors{ curve }
 	{
+		std::cout << "Constructing a new knot..." << std::endl;
+
 		// Initialize beads
 		for (size_t i = 0; i < rope.get_number_of_vertices(); ++i)
 		{
