@@ -14,7 +14,7 @@ in VS_OUT
 void main() 
 {	
 	float shadow = 0.0;
-	if (true)
+	if (u_display_shadows)
 	{
 		// Transform from light clip space to NDC
 		vec3 projection_space_coordinates = fs_in.light_space_position.xyz / fs_in.light_space_position.w;
@@ -26,7 +26,7 @@ void main()
 		float current = projection_space_coordinates.z;
 
 		// Filtering
-		const float bias = 0.01;
+		const float bias = 0.025;
 		const vec2 texel_size = 1.0 / textureSize(u_depth_map, 0);
 		const int kernel_steps = 10;
 		for(int x = -kernel_steps; x <= kernel_steps; ++x)

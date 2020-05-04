@@ -155,38 +155,38 @@ namespace geom
 		{
 			auto refined = PolygonalCurve{};
 
-			float total_length = perimeter();
-			for (float f = 0; f <= total_length; f += minimum_segment_length)
-			{
-				float percent = f / total_length;
-				percent = fminf(percent, 1.0f);
-				//std::cout << percent << std::endl;
-				refined.push_vertex(point_at(percent));
-			}
-
-			//refined.push_vertex(vertices.back());
-
-			//for (size_t i = 0; i < get_number_of_vertices() - 1; ++i)
+			//float total_length = perimeter();
+			//for (float f = 0; f <= total_length; f += minimum_segment_length)
 			//{
-			//	const auto segment = get_segment(i);
-
-			//	// Add the first point
-			//	refined.push_vertex(segment.get_start());
-
-			//	// Calculate how many vertices we will need to add between the
-			//	// start and end points of the original, unrefined segment
-			//	size_t number_of_subdivisions = (segment.length() / minimum_segment_length);
-			//	
-			//	// Add extra vertices
-			//	for (size_t division = 0; division < number_of_subdivisions; division++)
-			//	{
-			//		float t = static_cast<float>(division) / number_of_subdivisions;
-			//		refined.push_vertex(segment.point_at(t));
-			//	}
-
-			//	// Finally, add the second point
-			//	refined.push_vertex(segment.get_end());
+			//	float percent = f / total_length;
+			//	percent = fminf(percent, 1.0f);
+			//	//std::cout << percent << std::endl;
+			//	refined.push_vertex(point_at(percent));
 			//}
+
+			refined.push_vertex(vertices.back());
+
+			for (size_t i = 0; i < get_number_of_vertices() - 1; ++i)
+			{
+				const auto segment = get_segment(i);
+
+				// Add the first point
+				refined.push_vertex(segment.get_start());
+
+				// Calculate how many vertices we will need to add between the
+				// start and end points of the original, unrefined segment
+				size_t number_of_subdivisions = 4;
+				
+				// Add extra vertices
+				for (size_t division = 1; division < number_of_subdivisions; division++)
+				{
+					float t = static_cast<float>(division) / number_of_subdivisions;
+					refined.push_vertex(segment.point_at(t));
+				}
+
+				// Finally, add the second point
+				refined.push_vertex(segment.get_end());
+			}
 
 			return refined;
 		}

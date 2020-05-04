@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <filesystem>
 #include <iostream>
 
 #include "glad/glad.h"
@@ -14,6 +15,7 @@
 #include "history.h"
 #include "mesh.h"
 #include "shader.h"
+#include "to_string.h"
 
 // Data that will be associated with the GLFW window
 struct InputData
@@ -38,6 +40,9 @@ bool simulation_active = false;
 
 // Appearance settings
 ImVec4 clear_color = ImVec4(0.208f, 0.256f, 0.373f, 1.0f);
+
+std::vector<std::string> available_csvs;
+std::string current_csv;
 
 std::vector<std::string> cromwell_moves = { "Translation", "Commutation", "Stabilization", "Destabilization" };
 std::string current_move = cromwell_moves[0];
@@ -207,22 +212,7 @@ void message_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GL
     std::cout << src_str << ", " << type_str << ", " << severity_str << ", " << id << ": " << message << '\n';
 }
 
-std::vector<std::pair<size_t, size_t>> determine_selectable(const Diagram & diagram, const std::string & move)
-{
-
-    for (size_t i = 0; i < diagram.get_number_of_rows(); ++i)
-    {
-        for (size_t j = 0; j < diagram.get_number_of_cols(); ++j)
-        {
-            
-        }
-    }
-
-    return {};
-}
-
-
-void draw_diagram(const Diagram& diagram)
+void draw_diagram(const knot::Diagram& diagram)
 {
     ImGui::Text("Grid diagram is %u x %u", diagram.get_number_of_rows(), diagram.get_number_of_cols());
 
@@ -233,10 +223,38 @@ void draw_diagram(const Diagram& diagram)
     {
         for (size_t j = 0; j < diagram.get_size(); j++)
         {
-            std::string label = to_string(diagram.get_data()[i][j]);
-
-            //ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{ 0.0f, 0.0f, 0.0f, 1.0f });
-            //ImGui::PopStyleColor();
+            std::string label = utils::to_string(diagram.get_data()[i][j]);
+            
+            // Based on the current "edit" (i.e. Cromwell) mode, highlight certain grid cells
+            bool pop_color = false;
+            auto selectable_color = ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered];
+            selectable_color.x *= 0.75f;
+            selectable_color.y *= 0.75f;
+            selectable_color.z *= 0.75f;
+            const auto selected_color = ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered];
+            if (current_move == "Commutation")
+            {
+                ImGui::GetColorU32(ImGuiCol_ButtonHovered);
+                if ((static_cast<knot::Axis>(commutation_row_or_col) == knot::Axis::ROW && commutation_index == i) ||
+                    (static_cast<knot::Axis>(commutation_row_or_col) == knot::Axis::COL && commutation_index == j))
+                {
+                    pop_color = true;
+                    ImGui::PushStyleColor(ImGuiCol_Button, selected_color);
+                }
+            }
+            else if (current_move == "Stabilization")
+            {  
+                if (stabilization_index_i == i && stabilization_index_j == j)
+                {
+                    pop_color = true;
+                    ImGui::PushStyleColor(ImGuiCol_Button, selected_color);
+                }
+                else if (label == "x")
+                {
+                    pop_color = true;
+                    ImGui::PushStyleColor(ImGuiCol_Button, selectable_color);
+                }
+            }
 
             // If this is the last row, we only want to remove the horizontal item spacing
             if (i != diagram.get_size() - 1)
@@ -245,14 +263,17 @@ void draw_diagram(const Diagram& diagram)
             }
             else
             {
-                auto& style = ImGui::GetStyle();
-                auto default_item_spacing = style.ItemSpacing;
-                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0.0f, default_item_spacing.y });
+                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0.0f, ImGui::GetStyle().ItemSpacing.y });
             }
 
             if (ImGui::Button(label.c_str(), { button_dims, button_dims }))
             {
                 std::cout << "Pressed" << std::endl;
+            }
+
+            if (pop_color)
+            {
+                ImGui::PopStyleColor();
             }
 
             if (j != diagram.get_size() - 1)
@@ -303,7 +324,6 @@ void draw_diagram(const Diagram& diagram)
     }
 }
 
-
 GLFWwindow* window;
 
 void initialize()
@@ -350,8 +370,8 @@ void initialize()
     {
 #if defined(_DEBUG)
         // Debug logging
-        //glEnable(GL_DEBUG_OUTPUT);
-        //glDebugMessageCallback(message_callback, nullptr);
+        glEnable(GL_DEBUG_OUTPUT);
+        glDebugMessageCallback(message_callback, nullptr);
 #endif
         // Depth testing
         glEnable(GL_DEPTH_TEST);
@@ -366,25 +386,43 @@ void initialize()
     }
 }
 
+void load_csvs()
+{
+    for (auto& directory_entry : std::filesystem::directory_iterator("../diagrams")) 
+    {
+        if (directory_entry.path().extension() == ".csv")
+        {
+            std::cout << "Found knot diagram .csv at: " << directory_entry.path().generic_string() << std::endl;
+            available_csvs.push_back(directory_entry.path().generic_string());
+        }
+    }
+}
 int main()
 {
+    // Setup the GUI library + OpenGL, etc.
     initialize();
 
-    auto diagram = Diagram{ "../diagrams/kinoshita_terasaka.csv" };
+    // Load all of the grid diagram files
+    load_csvs();
+    if (available_csvs.size() == 0)
+    {
+        throw std::runtime_error("No .csv files found");
+    }
+    current_csv = available_csvs[0];
+
+    // Initialize the grid diagram
+    auto diagram = knot::Diagram{ current_csv };
     auto curve = diagram.generate_curve();
-    curve = curve.refine(0.75f);
+    auto knot = knot::Knot{ curve };
+    auto tube = geom::generate_tube(knot.get_rope());
 
-    auto tube = geom::generate_tube(curve, 0.5f, 10);
-    auto knot = Knot{ curve };
-
-
+    // Command log history messages
     auto history = utils::History{};
 
-
-
-    // Generate mesh primitives
-    auto grid_data = graphics::Mesh::from_grid(10.0f, 10.0f, glm::vec3{ 0.0f, -5.0f, 0.0f });
-    graphics::Mesh mesh_grid{ grid_data.first, grid_data.second };
+    // Load all of the relevant shader programs
+    auto shader_depth = graphics::Shader{ "../shaders/depth.vert", "../shaders/depth.frag" };
+    auto shader_draw = graphics::Shader{ "../shaders/render.vert", "../shaders/render.frag" };
+    auto shader_ui = graphics::Shader{ "../shaders/ui.vert", "../shaders/ui.frag" };
 
     uint32_t vao_tube;
     uint32_t vbo_tube;
@@ -413,11 +451,6 @@ int main()
         glVertexArrayAttribFormat(vao_curve, 0, 3, GL_FLOAT, GL_FALSE, 0);
         glVertexArrayAttribBinding(vao_curve, 0, 0);
     }
-
-
-    auto shader_depth = graphics::Shader{ "../shaders/depth.vert", "../shaders/depth.frag" };
-    auto shader_draw = graphics::Shader{ "../shaders/render.vert", "../shaders/render.frag" };
-    auto shader_ui = graphics::Shader{ "../shaders/ui.vert", "../shaders/ui.frag" };
 
     // Create the offscreen framebuffer that we will render the S2 sphere into
     uint32_t framebuffer_ui;
@@ -482,40 +515,80 @@ int main()
         // Poll regular GLFW window events
         glfwPollEvents();
 
-        // Start the Dear ImGui frame
+        // Start the ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
+
         {
+            bool topology_needs_update = false;
+
+            // Basic settings UI window
             {
                 ImGui::Begin("Settings");
+
+                // Change the background color
                 ImGui::ColorEdit3("clear color", (float*)&clear_color);
-                if (ImGui::Button("Reset"))
-                {
-                    knot.reset();
-                }
 
                 // Add some basic performanace monitoring
                 ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+                ImGui::Separator();
+
+                // Create the drop-down menu for selecting a Cromwell move
+                if (ImGui::BeginCombo("Grid Diagram File", current_csv.c_str()))
+                {
+                    for (size_t i = 0; i < available_csvs.size(); ++i)
+                    {
+                        bool is_selected = current_csv.c_str() == available_csvs[i];
+
+                        if (ImGui::Selectable(available_csvs[i].c_str(), is_selected))
+                        {
+                            current_csv = available_csvs[i];
+                            diagram = knot::Diagram{ current_csv };
+
+                            std::stringstream stream;
+                            stream << "Loaded diagram: ";
+                            stream << current_csv;
+
+                            history.push(stream.str(), utils::MessageType::INFO);
+
+                            topology_needs_update = true;
+                        }
+                        if (is_selected)
+                        {
+                            ImGui::SetItemDefaultFocus();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
 
                 // Draw the (un-extruded) knot
                 ImGui::Image((void*)(intptr_t)texture_ui, ImVec2(ui_w, ui_h), ImVec2(1, 1), ImVec2(0, 0));
-
+                ImGui::Text("Number of Grid Points: %u", curve.get_number_of_vertices());
+                
                 // Toggle the knot relaxation physics simulation
                 ImGui::Checkbox("Simulation Active", &simulation_active);
+
+                // Reset the simulation
+                if (ImGui::Button("Reset Simulation"))
+                {
+                    knot.reset();
+                }
 
                 // Add console log information
                 const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
                 ImGui::BeginChild("ScrollingRegion", ImVec2(0, -footer_height_to_reserve), false, ImGuiWindowFlags_HorizontalScrollbar);
                 for (const auto& item : history.get_messages())
                 {
+                    // Check to see if this message was an error message
                     bool pop_color = false;
                     if (item.second == utils::MessageType::ERROR)
                     {
                         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f)); 
                         pop_color = true;
                     }
-                  
+                    
+                    // Prefix each message with its type, i.e. "[Error]"
                     auto full_message = utils::to_string(item.second) + std::string(" ") + item.first;
                     ImGui::TextUnformatted(full_message.c_str());
 
@@ -529,6 +602,7 @@ int main()
                 ImGui::End();
             }
 
+            // Grid diagram settings UI window
             {
                 ImGui::Begin("Grid Diagram");
 
@@ -553,42 +627,41 @@ int main()
                     ImGui::EndCombo();
                 }
 
-                bool topology_needs_update = false;
-
+                // Create extra UI elements depending on the edit mode
                 if (current_move == "Translation")
                 {
                     auto direction_message = "";
 
                     if (ImGui::Button("Up"))
                     {
-                        diagram.apply_translation(Direction::U);
+                        diagram.apply_translation(knot::Direction::U);
                         topology_needs_update = true;
-                        direction_message = to_string(Direction::U);
+                        direction_message = utils::to_string(knot::Direction::U);
                     }
                     ImGui::SameLine();
                     if (ImGui::Button("Down"))
                     {
-                        diagram.apply_translation(Direction::D);
+                        diagram.apply_translation(knot::Direction::D);
                         topology_needs_update = true;
-                        direction_message = to_string(Direction::D);
+                        direction_message = utils::to_string(knot::Direction::D);
                     }
                     ImGui::SameLine();
                     if (ImGui::Button("Left"))
                     {
-                        diagram.apply_translation(Direction::L);
+                        diagram.apply_translation(knot::Direction::L);
                         topology_needs_update = true;
-                        direction_message = to_string(Direction::L);
+                        direction_message = utils::to_string(knot::Direction::L);
                     }
                     ImGui::SameLine();
                     if (ImGui::Button("Right"))
                     {
-                        diagram.apply_translation(Direction::R);
+                        diagram.apply_translation(knot::Direction::R);
                         topology_needs_update = true;
-                        direction_message = to_string(Direction::R);
+                        direction_message = utils::to_string(knot::Direction::R);
                     }
 
                     // Was one of the directional buttons actually pressed?
-                    if (topology_needs_update)
+                    if (topology_needs_update && direction_message != "")
                     {
                         std::stringstream stream;
                         stream << "Applied translation ";
@@ -600,7 +673,8 @@ int main()
                 else if (current_move == "Commutation")
                 {
                     // The user should select either "row" or "col" 
-                    ImGui::RadioButton("Row", &commutation_row_or_col, 0); ImGui::SameLine();
+                    ImGui::RadioButton("Row", &commutation_row_or_col, 0); 
+                    ImGui::SameLine();
                     ImGui::RadioButton("Col", &commutation_row_or_col, 1);
 
                     // The index of the row / col to switch
@@ -611,17 +685,17 @@ int main()
                     {
                         try
                         {
-                            diagram.apply_commutation(static_cast<Axis>(commutation_row_or_col), commutation_index);
+                            diagram.apply_commutation(static_cast<knot::Axis>(commutation_row_or_col), commutation_index);
                             topology_needs_update = true;
 
                             std::stringstream stream;
                             stream << "Applied commutation on ";
-                            stream << to_string(static_cast<Axis>(commutation_row_or_col));
+                            stream << utils::to_string(static_cast<knot::Axis>(commutation_row_or_col));
                             stream << " " << commutation_index << "<->" << commutation_index + 1;
 
                             history.push(stream.str(), utils::MessageType::INFO);
                         }
-                        catch (CromwellException e)
+                        catch (knot::CromwellException e)
                         {
                             history.push(e.get_message(), utils::MessageType::ERROR);
                         }
@@ -644,18 +718,18 @@ int main()
                     {
                         try
                         {
-                            diagram.apply_stabilization(static_cast<Cardinal>(stabilization_cardinal), stabilization_index_i, stabilization_index_j);
+                            diagram.apply_stabilization(static_cast<knot::Cardinal>(stabilization_cardinal), stabilization_index_i, stabilization_index_j);
                             topology_needs_update = true;
 
                             std::stringstream stream;
                             stream << "Applied stabilization (";
-                            stream << to_string(static_cast<Cardinal>(stabilization_cardinal)) << ") on ";
+                            stream << utils::to_string(static_cast<knot::Cardinal>(stabilization_cardinal)) << ") on ";
                             stream << "row: " << stabilization_index_i << ", ";
                             stream << "col: " << stabilization_index_j;
 
                             history.push(stream.str(), utils::MessageType::INFO);
                         }
-                        catch (CromwellException e)
+                        catch (knot::CromwellException e)
                         {
                             history.push(e.get_message(), utils::MessageType::ERROR);
                         }
@@ -670,10 +744,10 @@ int main()
 
                     // Rebuild the curve that corresponds to this diagram
                     curve = diagram.generate_curve();
-                    curve = curve.refine(0.75f);
+                    //urve = curve.refine(0.75f);
 
                     // Rebuild the knot
-                    knot = Knot{ curve };
+                    knot = knot::Knot{ curve };
                     
                     // Rebuild VAO / VBO for tube mesh
                     tube = geom::generate_tube(knot.get_rope());
@@ -749,11 +823,11 @@ int main()
                 knot.relax();
 
                 tube = geom::generate_tube(knot.get_rope());
-                glNamedBufferSubData(vbo_tube, 0, sizeof(glm::vec3)* tube.size(), tube.data());
+                glNamedBufferSubData(vbo_tube, 0, sizeof(glm::vec3) * tube.size(), tube.data());
             }
 
             // Setup faux light position, projection matrix, etc.
-            glm::vec3 light_position{ -2.0f, 2.0f, 5.0f };
+            const glm::vec3 light_position{ -2.0f, 2.0f, 5.0f };
             const float near_plane = 0.0f;
             const float far_plane = 20.0f;
             const float ortho_width = 30.0f;
@@ -777,10 +851,6 @@ int main()
                shader_depth.uniform_mat4("u_model", arcball_model_matrix);
                glBindVertexArray(vao_tube);
                glDrawArrays(GL_TRIANGLES, 0, tube.size());
-
-               // Draw the floor plane
-               shader_depth.uniform_mat4("u_model", glm::mat4{ 1.0f });
-               mesh_grid.draw();
                
                glBindFramebuffer(GL_FRAMEBUFFER, 0);
            }
@@ -799,23 +869,19 @@ int main()
                    1000.0f
                );
 
-               shader_draw.use();
- 
+               // Bind the depth map from the previous render pass
                glBindTextureUnit(0, texture_depth);
-                //shader.uniform_bool("u_display_shadows", display_shadows);
+
+               shader_draw.use();
+               shader_draw.uniform_bool("u_display_shadows", true);
                shader_draw.uniform_mat4("u_light_space_matrix", light_space_matrix);
                shader_draw.uniform_float("u_time", glfwGetTime());
-
                shader_draw.uniform_mat4("u_projection", projection);
                shader_draw.uniform_mat4("u_view", arcball_camera_matrix);
                shader_draw.uniform_mat4("u_model", arcball_model_matrix);
 
                glBindVertexArray(vao_tube);
                glDrawArrays(GL_TRIANGLES, 0, tube.size());
-
-
-              //shader_draw.uniform_mat4("u_model", glm::mat4{ 1.0f });
-              //mesh_grid.draw();
            }
 
         }
@@ -832,7 +898,17 @@ int main()
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
-       
+
+    // Delete OpenGL objects
+    glDeleteVertexArrays(1, &vao_curve);
+    glDeleteVertexArrays(1, &vao_tube);
+    glDeleteBuffers(1, &vbo_curve);
+    glDeleteBuffers(1, &vbo_tube);
+    glDeleteTextures(1, &texture_depth);
+    glDeleteTextures(1, &texture_ui);
+    glDeleteFramebuffers(1, &framebuffer_depth);
+    glDeleteFramebuffers(1, &framebuffer_ui);
+
     // Clean-up GLFW
     glfwDestroyWindow(window);
     glfwTerminate();

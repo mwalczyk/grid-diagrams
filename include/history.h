@@ -13,18 +13,6 @@ namespace utils
 		INFO
 	};
 
-	inline const char* to_string(MessageType entry)
-	{
-		switch (entry)
-		{
-		case MessageType::WARNING: return "[Warning]";
-		case MessageType::ERROR: return "[Error]";
-		case MessageType::INFO: return "[Info]";
-		default: return "uknown";
-		}
-	}
-
-
 	class History
 	{
 
