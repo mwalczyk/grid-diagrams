@@ -23,38 +23,35 @@ Before the knot is rendered, a path-guided extrusion is performed to "thicken" t
 ### Cromwell Moves
 The Cromwell Moves are similar to the [Reidemeister Moves](https://en.wikipedia.org/wiki/Reidemeister_move), specifically applied to grid diagrams. They all us to obtain isotopic knots, i.e. knots that have the same underlying topology but "look" different. This gives us a way to systematically explore a given knot invariant.
 
-In `knots`, the Cromwell Moves are represented as an `enum`:
-
-```rust
-enum CromwellMove {
-    // A move that cyclically translates a row or column in one of four directions: up, down, left, or right
-    Translation(Direction),
-
-    // A move that exchanges to adjacent, non-interleaved rows or columns
-    Commutation { axis: Axis, start_index: usize, },
-
-    // A move that replaces an `x` with a 2x2 sub-grid
-    Stabilization { cardinality: Cardinality, i: usize, j: usize, },
-    
-    // A move that replaces a 2x2 sub-grid with an `x` (the opposite of an x-stabilization): currently not supported
-    Destabilization { cardinality: Cardinality, i: usize, j: usize, },
-}
-```
+There are 4 different Cromwell moves:
+1. Translation: A move that cyclically translates a row or column in one of four directions: up, down, left, or right
+2. Commutation: A move that exchanges to adjacent, non-interleaved rows or columns
+3. Stabilization: A move that replaces an `x` with a 2x2 sub-grid
+4. Destabilization: A move that replaces a 2x2 sub-grid with an `x` (the opposite of an x-stabilization): currently not supported
 
 ## Tested On
-- Windows 8.1
-- NVIDIA GeForce GT 750M
-- Rust compiler version `1.38.0-nightly` (nightly may not be required)
+- Windows 10
+- NVIDIA GeForce GTX 1660 Ti
 
-NOTE: this project will only run on graphics cards that support OpenGL [Direct State Access](https://www.khronos.org/opengl/wiki/Direct_State_Access) (DSA).
+NOTE: this project will only run on graphics cards that support OpenGL [Direct State Access](https://www.khronos.org/opengl/wiki/Direct_State_Access) (DSA). It also depends on C++17.
 
 ## To Build
-1. Clone this repo.
-2. Make sure 🦀 [Rust](https://www.rust-lang.org/en-US/) installed and `cargo` is in your `PATH`.
-3. Inside the repo, run: `cargo build --release`.
+1. Clone this repo and initialize submodules: 
+```shell
+git submodule init
+git submodule update
+```
+2. From the root directory, run the following commands:
+```shell
+mkdir build
+cd build
+cmake ..
+```
+3. Open the project file for your IDE of choice (generated above)
+4. Build and run the project
 
 ## To Use
-All grid diagrams must be "square" `.csv` files (the same number of rows as columns). Each row and column must have _exactly_ one `x` and one `o`: all other entries should be spaces ("blank"). The grid diagram will be validated upon construction, but the program will `panic!` if one of the conditions above is not met. An example grid diagram for the trefoil knot is shown below:
+All grid diagrams must be "square" `.csv` files (the same number of rows as columns). Each row and column must have _exactly_ one `x` and one `o`: all other entries should be spaces ("blank"). The grid diagram will be validated upon construction, but the program will exit if one of the conditions above is not met. An example grid diagram for the trefoil knot is shown below:
 
 ```
 "x"," ","o"," "," "
@@ -64,17 +61,17 @@ All grid diagrams must be "square" `.csv` files (the same number of rows as colu
 " ","o"," "," ","x"
 ```
 
-To rotate the camera around the object in 3-dimensions, press + drag the left mouse button. Press `h` to "home" (i.e. reset) the camera.
-
-You can change between wireframe and filled modes by pressing `w` and `f`. You can save out a screenshot by pressing `s`. Finally, you can reset the physics simulation by pressing `r`.
-
 ## To Do
-- [ ] Implement a knot "drawing" tool
-- [ ] Add segment-segment intersection test for more robust topological refinement
-- [ ] Add a GUI for viewing the current grid diagram
-- [ ] Generate the Dowker notation for a given knot diagram
-- [ ] Explore planar graphs and their relationship to knot diagrams
-- [ ] Implement a `tangle` calculator for generating knots (Conway notation)
+- [ ] Add bounding box checks (see section `7.2.2` of Scharein's thesis) to accelerate segment-segment intersection tests
+
+### Future Directions
+One interesting topic of research in knot theory is that of random knot generation. This turns out to be quite a challenging problem. How do we generate a curve that is *actually* knotted? Moreover, how do we *prove* that it is, in fact, knotted? Dr. Jason Cantarella has done significant research into this topic, which I would love to explore. Early on, I created a "naive" algorithm for randomly generating grid diagrams, but the vast majority of these diagrams resulted in the unknot. This observation prompted me to explore this problem further.
+
+Fundamental to the problem of random knot generation is representation. More specifically, what are ways that we can represent knots (mathematically, or otherwise)? Clearly, grid diagrams are one form of representation, but there are others. One interesting algorithm is the so-called "hedgehog method," which produces random, polygonal curves. Knots can also be represented as planar graphs, which leads to the question: how can we generate random, 4-valent planar graphs? My initial research yielded [blossom trees](https://en.wikipedia.org/wiki/Blossom_tree_(graph_theory)), which are essentially trees with additional edges that are used to form closed loops in the graph. Blossom trees can be used to sample random planar graphs.
+
+Beyond this, there are also other ways to catalog and diagram knots: Dowker codes, Conway notation, Gauss codes, braid representations, among others. Dr. Scharein (mentioned below) implemented a "tangle calculator" for building knots from small, molecular components called "tangles." He also implemented a tool for "drawing" knots by hand, which is something that I explored as well. One challenge with such a tool is: how does the user specify under-/over-crossings? In the prototype that I created, the crossings would simply alternate whenever the user crossed an existing strand. There is a lot to explore here as well!
+
+Finally, the pseudo-physical simulation used in this program is just one way to perform topological refinement. Dr. Cantarella has also explored this topic with his "ridgerunner" software, which can "tighten" a knot via a form of constrained gradient descent. Are there other ways to accurately "relax" knots? 
 
 ## Credits
 This project was largely inspired by and based on previous work done by Dr. Robert Scharein, whose PhD [thesis](https://knotplot.com/thesis/) and [software](https://knotplot.com/) were vital towards my understanding of the relaxation / meshing procedures.

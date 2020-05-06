@@ -42,6 +42,109 @@ namespace geom
 			return glm::lerp(a, b, t);
 		}
 
+		/// Returns a vector between the two closest points between this segment 
+		/// and `other`.
+		glm::vec3 shortest_distance_between(const Segment& other) const
+		{
+			const auto u = b - a;
+			const auto v = other.b - other.a;
+			const auto w = a - other.a;
+			const auto a = glm::dot(u, u); 
+			const auto b = glm::dot(u, v);
+			const auto c = glm::dot(v, v);
+			const auto d = glm::dot(u, w);
+			const auto e = glm::dot(v, w);
+			const auto D = a * c - b * b; 
+
+			auto sc = 0.0f;
+			auto sN = 0.0f;
+			auto sD = D; 
+			auto tc = 0.0f;
+			auto tN = 0.0f;
+			auto tD = D; 
+
+			// Compute the line parameters of the two closest points
+			if (D < 0.001f) 
+			{
+				// The lines are almost parallel
+				sN = 0.0f; 
+				sD = 1.0f; 
+				tN = e;
+				tD = c;
+			}
+			else 
+			{
+				// Get the closest points on the infinite lines
+				sN = b * e - c * d;
+				tN = a * e - b * d;
+
+				if (sN < 0.0f)
+				{
+					// sc < 0 => the s = 0 edge is visible
+					sN = 0.0f;
+					tN = e;
+					tD = c;
+				}
+				else if (sN > sD)
+				{
+					// sc > 1  => the s = 1 edge is visible
+					sN = sD;
+					tN = e + b;
+					tD = c;
+				}
+			}
+
+			if (tN < 0.0f)
+			{
+				// tc < 0 => the t = 0 edge is visible
+				tN = 0.0f;
+
+				// Recompute `sc` for this edge
+				if (-d < 0.0f)
+				{
+					sN = 0.0f;
+				}
+				else if (-d > a)
+				{
+					sN = sD;
+				}
+				else 
+				{
+					sN = -d;
+					sD = a;
+				}
+			}
+			else if (tN > tD)
+			{
+				// tc > 1  => the t = 1 edge is visible
+				tN = tD;
+
+				// Recompute `sc` for this edge
+				if ((-d + b) < 0.0f) 
+				{
+					sN = 0.0;
+				}
+				else if ((-d + b) > a)
+				{
+					sN = sD;
+				}
+				else 
+				{
+					sN = -d + b;
+					sD = a;
+				}
+			}
+
+			// Finally, do the division to get sc and tc
+			sc = abs(sN) < 0.001f ? 0.0f : sN / sD;
+			tc = abs(tN) < 0.001f ? 0.0f : tN / tD;
+
+			// Get the vector difference of the two closest points
+			const auto vector_between_closest_points = w + (sc * u) - (tc * v); 
+
+			return vector_between_closest_points;
+		}
+
 	private:
 
 		glm::vec3 a;
@@ -76,7 +179,7 @@ namespace geom
 		/// `get_wrapped_index(11)` would return `0` (i.e. the first vertex).
 		size_t get_wrapped_index(size_t index) const
 		{
-			return index % (get_number_of_vertices() + 1);
+			return (index + get_number_of_vertices()) % get_number_of_vertices();
 		}
 
 		/// Returns the indices of the "left" and "right" neighbors to the vertex at
@@ -112,7 +215,10 @@ namespace geom
 		/// Returns the line segment between vertex `index` and `index + 1`.
 		Segment get_segment(size_t index) const
 		{
-			return Segment{ vertices[index + 0], vertices[index + 1] };
+			return Segment{ 
+				vertices[get_wrapped_index(index + 0)], 
+				vertices[get_wrapped_index(index + 1)] 
+			};
 		}
 
 		/// Returns the point at `t` along this curve, where a value of `0.0`

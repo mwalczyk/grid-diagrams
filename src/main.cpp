@@ -56,6 +56,8 @@ int stabilization_index_j = 0;
 
 InputData input_data;
 
+GLFWwindow* window;
+
 /**
  * A function for handling scrolling.
  */
@@ -324,8 +326,6 @@ void draw_diagram(const knot::Diagram& diagram)
     }
 }
 
-GLFWwindow* window;
-
 void initialize()
 {
     // Create and configure the GLFW window 
@@ -383,9 +383,13 @@ void initialize()
         // Configure point and line size
         glLineWidth(8.0f);
         glPointSize(16.0f);
+        glEnable(GL_PROGRAM_POINT_SIZE);
     }
 }
 
+/**
+ * Load all available knot .csv files from the "diagrams" folder.
+ */
 void load_csvs()
 {
     for (auto& directory_entry : std::filesystem::directory_iterator("../diagrams")) 
@@ -397,6 +401,7 @@ void load_csvs()
         }
     }
 }
+
 int main()
 {
     // Setup the GUI library + OpenGL, etc.
@@ -410,10 +415,23 @@ int main()
     }
     current_csv = available_csvs[0];
 
+    //auto segment_a = geom::Segment{ glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0) };
+    //auto segment_b = geom::Segment{ glm::vec3(0.0, 0.0, 1.0), glm::vec3(2.0, 0.0, 1.0) };
+
+    //auto shortest_distance = segment_a.shortest_distance_between(segment_b);
+    //assert(glm::length(shortest_distance), 1.0f);
+    //std::cout << "Test 0 length: " << glm::length(shortest_distance) << std::endl;
+
+
     // Initialize the grid diagram
     auto diagram = knot::Diagram{ current_csv };
     auto curve = diagram.generate_curve();
     auto knot = knot::Knot{ curve };
+    const size_t warmup_iterations = 3;
+    for (size_t i = 0; i < warmup_iterations; i++)
+    {
+        knot.relax();
+    }
     auto tube = geom::generate_tube(knot.get_rope());
 
     // Command log history messages
@@ -440,16 +458,28 @@ int main()
 
     uint32_t vao_curve;
     uint32_t vbo_curve;
+    uint32_t vbo_curve_stuck;
     {
         glCreateVertexArrays(1, &vao_curve);
 
         glCreateBuffers(1, &vbo_curve);
         glNamedBufferStorage(vbo_curve, sizeof(glm::vec3) * curve.get_number_of_vertices(), curve.get_vertices().data(), GL_DYNAMIC_STORAGE_BIT);
 
+        const auto stuck = knot.get_stuck();
+        glCreateBuffers(1, &vbo_curve_stuck);
+        glNamedBufferStorage(vbo_curve_stuck, sizeof(int32_t) * stuck.size(), stuck.data(), GL_DYNAMIC_STORAGE_BIT);
+
+        // Bind a buffer to a vertex buffer bind point
         glVertexArrayVertexBuffer(vao_curve, 0, vbo_curve, 0, sizeof(glm::vec3));
+        glVertexArrayVertexBuffer(vao_curve, 1, vbo_curve_stuck, 0, sizeof(int32_t)); // vao, binding, buffer, offset, stride
+
         glEnableVertexArrayAttrib(vao_curve, 0);
         glVertexArrayAttribFormat(vao_curve, 0, 3, GL_FLOAT, GL_FALSE, 0);
         glVertexArrayAttribBinding(vao_curve, 0, 0);
+
+        glEnableVertexArrayAttrib(vao_curve, 1);
+        glVertexArrayAttribIFormat(vao_curve, 1, 1, GL_INT, 0); // vao, attrib, size, type, offset
+        glVertexArrayAttribBinding(vao_curve, 1, 1); // vao, attrib, binding
     }
 
     // Create the offscreen framebuffer that we will render the S2 sphere into
@@ -520,6 +550,7 @@ int main()
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
+        // Draw the UI elements (buttons, sliders, etc.)
         {
             bool topology_needs_update = false;
 
@@ -574,6 +605,14 @@ int main()
                 {
                     knot.reset();
                 }
+
+                // Simulation params
+                ImGui::SliderFloat("Damping", &knot.get_simulation_params().damping, 0.1f, 0.75f);
+                ImGui::SliderFloat("Anchor Weight", &knot.get_simulation_params().anchor_weight, 0.0f, 0.5f);
+                ImGui::SliderFloat("Beta", &knot.get_simulation_params().beta, 1.0f, 5.0f);
+                ImGui::SliderFloat("H", &knot.get_simulation_params().h, 0.0f, 15.0f);
+                ImGui::SliderFloat("Alpha", &knot.get_simulation_params().alpha, 1.0f, 5.0f);
+                ImGui::SliderFloat("K", &knot.get_simulation_params().k, 0.0f, 15.0f);
 
                 // Add console log information
                 const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
@@ -748,6 +787,14 @@ int main()
 
                     // Rebuild the knot
                     knot = knot::Knot{ curve };
+
+                    if (!simulation_active)
+                    {
+                        for (size_t i = 0; i < warmup_iterations; i++)
+                        {
+                            knot.relax();
+                        }
+                    }
                     
                     // Rebuild VAO / VBO for tube mesh
                     tube = geom::generate_tube(knot.get_rope());
@@ -764,21 +811,36 @@ int main()
                     // Rebuild VAO / VBO for curve mesh
                     glCreateVertexArrays(1, &vao_curve);
 
+                    // Rebuild buffer #0
                     glCreateBuffers(1, &vbo_curve);
                     glNamedBufferStorage(vbo_curve, sizeof(glm::vec3) * curve.get_number_of_vertices(), curve.get_vertices().data(), GL_DYNAMIC_STORAGE_BIT);
-
+                    
+                    // Rebuild buffer #1
+                    auto stuck = knot.get_stuck();
+                    glCreateBuffers(1, &vbo_curve_stuck);
+                    glNamedBufferStorage(vbo_curve_stuck, sizeof(int32_t)* stuck.size(), stuck.data(), GL_DYNAMIC_STORAGE_BIT);
+      
+                    // Bind a buffer to a vertex buffer bind point
                     glVertexArrayVertexBuffer(vao_curve, 0, vbo_curve, 0, sizeof(glm::vec3));
+                    glVertexArrayVertexBuffer(vao_curve, 1, vbo_curve_stuck, 0, sizeof(int32_t)); 
+
+                    // Specify vertex attirbute #0
                     glEnableVertexArrayAttrib(vao_curve, 0);
                     glVertexArrayAttribFormat(vao_curve, 0, 3, GL_FLOAT, GL_FALSE, 0);
                     glVertexArrayAttribBinding(vao_curve, 0, 0);
+
+                    // Specify vertex attirbute #1
+                    glEnableVertexArrayAttrib(vao_curve, 1);
+                    glVertexArrayAttribIFormat(vao_curve, 1, 1, GL_INT, 0); 
+                    glVertexArrayAttribBinding(vao_curve, 1, 1); 
                 }
 
                 ImGui::End();
             }
             
         }
+        
         ImGui::Render();
-
         
         // Render 3D objects to UI (offscreen) framebuffer
         {
@@ -807,7 +869,6 @@ int main()
             shader_ui.uniform_mat4("u_projection", projection);
             shader_ui.uniform_mat4("u_view", view);
             shader_ui.uniform_mat4("u_model", glm::mat4{ 1.0f });
-            
             glBindVertexArray(vao_curve);
             glDrawArrays(GL_LINE_LOOP, 0, curve.get_number_of_vertices());
             glDrawArrays(GL_POINTS, 0, curve.get_number_of_vertices());
@@ -824,6 +885,10 @@ int main()
 
                 tube = geom::generate_tube(knot.get_rope());
                 glNamedBufferSubData(vbo_tube, 0, sizeof(glm::vec3) * tube.size(), tube.data());
+
+                const auto stuck = knot.get_stuck();
+                glNamedBufferSubData(vbo_curve_stuck, 0, sizeof(int32_t) * stuck.size(), stuck.data());
+               
             }
 
             // Setup faux light position, projection matrix, etc.
@@ -844,10 +909,9 @@ int main()
                const float clear_depth_value = 1.0f;
                glClearNamedFramebufferfv(framebuffer_depth, GL_DEPTH, 0, &clear_depth_value);
 
+               // Draw the knot
                shader_depth.use();
                shader_depth.uniform_mat4("u_light_space_matrix", light_space_matrix);
-
-               // Draw the knot
                shader_depth.uniform_mat4("u_model", arcball_model_matrix);
                glBindVertexArray(vao_tube);
                glDrawArrays(GL_TRIANGLES, 0, tube.size());
@@ -872,6 +936,7 @@ int main()
                // Bind the depth map from the previous render pass
                glBindTextureUnit(0, texture_depth);
 
+               // Draw the knot (with shadows)
                shader_draw.use();
                shader_draw.uniform_bool("u_display_shadows", true);
                shader_draw.uniform_mat4("u_light_space_matrix", light_space_matrix);
@@ -879,7 +944,6 @@ int main()
                shader_draw.uniform_mat4("u_projection", projection);
                shader_draw.uniform_mat4("u_view", arcball_camera_matrix);
                shader_draw.uniform_mat4("u_model", arcball_model_matrix);
-
                glBindVertexArray(vao_tube);
                glDrawArrays(GL_TRIANGLES, 0, tube.size());
            }
@@ -894,7 +958,7 @@ int main()
         glfwSwapBuffers(window);
     }
 
-    // Clean-up imgui
+    // Clean-up UI bits
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();

@@ -652,7 +652,7 @@ namespace knot
 
 			}
 
-			//curve.pop_vertex();
+			points.pop_back();
 
 			return geom::PolygonalCurve{ points };
 		}

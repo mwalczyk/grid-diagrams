@@ -10,27 +10,36 @@ namespace knot
 	struct SimulationParams
 	{
 		// The (average?) length of each line segment ("stick"), prior to relaxation
-		float starting_length = 0.25f;
+		float starting_length = 1.0f;
 
 		// The maximum distance a bead can travel per time-step
-		float d_max = starting_length * 0.025f;
+		float d_max = starting_length * 0.0125f;
 
-		// The closest any two sticks can be (note that this should be larger than `d_max`)
-		float d_close = starting_length * 0.25f;
+		// The closest any two sticks can be (note that this should be larger than `d_max` and should probably match the radius of the extruded tube)
+		float d_close = starting_length * 0.5f;
 
 		// The mass of each node ("bead"): we leave this unchanged for now
 		float mass = 1.0f;
 
 		// Velocity damping factor
-		float damping = 0.25f;
+		float damping = 0.3f;
 
 		// How much each bead wants to stay near its original position (0 means that we ignore this force)
-		float anchor_weight = 0.01f;
+		float anchor_weight = 0.0f;
 
+		// Exponent used for calculating a pseudo-physical spring attraction force between neighboring beads
 		float beta = 1.0f;
+
+		// Scalar multiplier used for calculating a pseudo-physical spring attraction force between neighboring beads
 		float h = 1.0f;
+
+		// Exponent used for calculating a pseudo-physical electrostatic repulsion force between non-neighboring beads
 		float alpha = 4.0f;
+
+		// Scalar multiplier used for calculating a pseudo-physical electrostatic repulsion force between non-neighboring beads
 		float k = 1.0f;
+
+		// Epsilon used for numerical stability
 		float epsilon = 0.001f;
 	};
 
@@ -40,6 +49,7 @@ namespace knot
 	public:
 
 		Bead(const glm::vec3& position, size_t index, size_t neighbor_l_index, size_t neighbor_r_index) :
+			prev_position{ position },
 			position{ position },
 			velocity{ glm::vec3{0.0f, 0.0f, 0.0f} },
 			acceleration{ glm::vec3{0.0f, 0.0f, 0.0f} },
@@ -66,10 +76,10 @@ namespace knot
 			// Zero out the acceleration for the next time step
 			acceleration = glm::vec3{};
 
-			// Set new position
-			const auto old = position;
+			// Save the old position
+			prev_position = position;
 
-			// Each particle can travel (at most) `d_max` units each time step
+			// Set new position: each particle can travel (at most) `d_max` units each time step
 			const auto clamped = glm::length(velocity) > params.d_max ? glm::normalize(velocity) * params.d_max : velocity;
 			position += clamped;
 
@@ -78,6 +88,8 @@ namespace knot
 		}
 
 	private:
+
+		glm::vec3 prev_position;
 
 		// The position of the bead in 3-space
 		glm::vec3 position;
@@ -141,11 +153,20 @@ namespace knot
 			}
 		}
 
-		/// Returns an immutable reference to the polyline that formed this knot, prior
-		/// to relaxation.
+		/// Returns a reference to the polyline that formed this knot, prior to relaxation.
 		const geom::PolygonalCurve& get_rope() const
 		{
+			for (const auto& p : rope.get_vertices())
+			{
+				//std::cout << p.x << ", " << p.y << "\n";
+			}
 			return rope;
+		}
+
+		/// Returns a reference to the simulation parameters used by the simulation.
+		SimulationParams& get_simulation_params()
+		{
+			return params;
 		}
 
 		/// Performs a pseudo-physical form of topological refinement, based on spring
@@ -211,6 +232,37 @@ namespace knot
 				}
 
 				bead.apply_forces(force, params);
+				bead.is_stuck = false;
+
+				// Check for any new segment-segment intersections: remember that segments are indexed by their "left"
+				// endpoint, so the segment at index `bead.index` is actually the segment to the "right" of the bead
+				const auto segment_l = rope.get_segment(bead.neighbor_l_index);
+				const auto segment_r = rope.get_segment(bead.index);
+				for (size_t segment_index = 0; segment_index < rope.get_number_of_vertices(); segment_index++)
+				{
+					// For all non-adjacent segments...
+					if (segment_index != bead.neighbor_l_index && 
+						segment_index != bead.index &&
+						segment_index != rope.get_wrapped_index(bead.neighbor_l_index - 1) &&
+						segment_index != rope.get_wrapped_index(bead.neighbor_r_index))
+					{
+						const auto other = rope.get_segment(segment_index);
+						auto closest_to_l = segment_l.shortest_distance_between(other);
+						auto closest_to_r = segment_r.shortest_distance_between(other);
+
+						if (glm::length(closest_to_l) < params.d_close || glm::length(closest_to_r) < params.d_close)
+						{
+							//float m = fminf(glm::length(closest_to_l), glm::length(closest_to_r));
+							std::cout << "Bead at index " << bead.index << " has adjacent segments that are too close to segment: " << segment_index << "\n";
+							bead.position = bead.prev_position;
+
+							//std::cout << "\tDistance to L segment: " << glm::length(closest_to_l) << "\n";
+							//std::cout << "\tDistance to R segment: " << glm::length(closest_to_r) << "\n";
+							bead.is_stuck = true;
+							break;
+						}
+					}
+				}
 			}
 
 			// Update polyline positions for rendering
@@ -225,7 +277,18 @@ namespace knot
 			for (size_t i = 0; i < beads.size(); i++)
 			{
 				beads[i].position = anchors.get_vertices()[i];
+				beads[i].is_stuck = false;
 			}
+		}
+
+		std::vector<int32_t> get_stuck() const
+		{
+			std::vector<int32_t> stuck;
+			std::transform(beads.begin(), beads.end(), std::back_inserter(stuck), [](Bead bead) -> int32_t {
+				return bead.is_stuck ? 1 : 0;
+			});
+
+			return stuck;
 		}
 
 	private:
@@ -234,7 +297,9 @@ namespace knot
 		{
 			std::vector<glm::vec3> positions;
 			std::transform(beads.begin(), beads.end(), std::back_inserter(positions),
-				[](Bead bead) -> glm::vec3 { return bead.position; });
+				[](Bead bead) -> glm::vec3 {
+				return bead.position; 
+			});
 
 			return positions;
 		}
