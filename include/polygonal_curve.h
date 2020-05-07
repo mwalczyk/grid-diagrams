@@ -152,6 +152,58 @@ namespace geom
 
 	};
 
+	class BoundingBox
+	{
+
+	public:
+
+		BoundingBox(const glm::vec3& min_point, const glm::vec3& max_point) :
+			min_point{ min_point },
+			max_point{ max_point }
+		{
+		}
+
+		BoundingBox(const std::vector<glm::vec3>& points)
+		{
+			float min_x = std::numeric_limits<float>::max();
+			float min_y = std::numeric_limits<float>::max();
+			float min_z = std::numeric_limits<float>::max();
+
+			float max_x = std::numeric_limits<float>::min();
+			float max_y = std::numeric_limits<float>::min();
+			float max_z = std::numeric_limits<float>::min();
+
+			for (const auto& point : points)
+			{
+				min_x = point.x < min_x ? point.x : min_x;
+				min_y = point.y < min_y ? point.y : min_y;
+				min_z = point.z < min_z ? point.z : min_z;
+
+				max_x = point.x > max_x ? point.x : max_x;
+				max_y = point.y > max_y ? point.y : max_y;
+				max_z = point.z > max_z ? point.z : max_z;
+			}
+			
+			min_point = { min_x, min_y, min_z };
+			max_point = { max_x, max_y, max_z };
+		}
+
+		glm::vec3 get_center() const
+		{
+			return (min_point + max_point) * 0.5f;
+		}
+
+		glm::vec3 get_size() const
+		{
+			return max_point - min_point;
+		}
+
+	private:
+
+		glm::vec3 min_point;
+		glm::vec3 max_point;
+	};
+
 	class PolygonalCurve
 	{
 
@@ -212,13 +264,16 @@ namespace geom
 			return length;
 		}
 
+		/// Returns the bounding box of this curve.
+		BoundingBox get_bounds() const
+		{
+			return { vertices };
+		}
+
 		/// Returns the line segment between vertex `index` and `index + 1`.
 		Segment get_segment(size_t index) const
 		{
-			return Segment{ 
-				vertices[get_wrapped_index(index + 0)], 
-				vertices[get_wrapped_index(index + 1)] 
-			};
+			return { vertices[get_wrapped_index(index + 0)], vertices[get_wrapped_index(index + 1)] };
 		}
 
 		/// Returns the point at `t` along this curve, where a value of `0.0`
@@ -327,6 +382,8 @@ namespace geom
 
 	};
 
+	/// Generates an extruded tube from the specified curve. Within the context of this program, an "extruded tube" is a thick, tubular mesh
+	/// with a circular cross-section of constant radius. 
 	std::vector<glm::vec3> generate_tube(const PolygonalCurve& curve, float radius = 0.5f, size_t number_of_segments = 10)
 	{
 		const auto circle_normal = glm::vec3{ 0.0f, 1.0f, 0.0f };
@@ -357,13 +414,11 @@ namespace geom
 
 			// Calculate the tangent vector at the current point along the polyline
 			auto diff = towards_r - towards_l;
-			float l2 = diff.x * diff.x + diff.y * diff.y + diff.z * diff.z; // glm::length(towards_r - towards_l)* glm::length(towards_r - towards_l);
-			
+			float l2 = glm::length(towards_r - towards_l) * glm::length(towards_r - towards_l);
 			auto t = l2 > 0.0f ? glm::normalize(towards_r - towards_l) : -towards_l;
 
 			// Calculate the next `u` basis vector: find an arbitrary vector perpendicular to the first tangent vector
 			auto u = i == 0 ? glm::normalize(glm::cross(glm::vec3{ 0.0f, 0.0f, 1.0f }, t)) : glm::normalize(glm::cross(t, v_prev));
-
 
 			// Calculate the next `v` basis vector
 			auto v = glm::normalize(glm::cross(u, t));
@@ -413,8 +468,6 @@ namespace geom
 			}
 		}
 
-		
-		
 		return triangles;
 	}
 

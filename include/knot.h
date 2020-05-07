@@ -156,10 +156,6 @@ namespace knot
 		/// Returns a reference to the polyline that formed this knot, prior to relaxation.
 		const geom::PolygonalCurve& get_rope() const
 		{
-			for (const auto& p : rope.get_vertices())
-			{
-				//std::cout << p.x << ", " << p.y << "\n";
-			}
 			return rope;
 		}
 
@@ -188,8 +184,7 @@ namespace knot
 						// Grab the "other" bead, which may or may not be a neighbor to "bead"
 						if (bead.are_neighbors(other))
 						{
-							// This is a neighboring bead: calculate the (attractive) mechanical spring force that
-							// will pull this bead towards `other`
+							// This is a neighboring bead: calculate the (attractive) mechanical spring force that will pull this bead towards `other`
 							auto direction = other.position - bead.position;
 							auto r = glm::length(direction);
 							direction = glm::normalize(direction);
@@ -213,7 +208,7 @@ namespace knot
 								continue;
 							}
 
-							force += direction * params.k * powf(r, -(2.0 + params.alpha));
+							force += direction * params.k * powf(r, -(2.0f + params.alpha));
 						}
 					}
 				}
@@ -252,13 +247,13 @@ namespace knot
 
 						if (glm::length(closest_to_l) < params.d_close || glm::length(closest_to_r) < params.d_close)
 						{
-							//float m = fminf(glm::length(closest_to_l), glm::length(closest_to_r));
-							std::cout << "Bead at index " << bead.index << " has adjacent segments that are too close to segment: " << segment_index << "\n";
-							bead.position = bead.prev_position;
-
+							//std::cout << "Bead at index " << bead.index << " has adjacent segments that are too close to segment: " << segment_index << "\n";
 							//std::cout << "\tDistance to L segment: " << glm::length(closest_to_l) << "\n";
 							//std::cout << "\tDistance to R segment: " << glm::length(closest_to_r) << "\n";
+
+							bead.position = bead.prev_position;
 							bead.is_stuck = true;
+
 							break;
 						}
 					}
@@ -313,6 +308,7 @@ namespace knot
 		// All of the "beads" (i.e. points with a position, velocity, and acceleration) that make up this knot
 		std::vector<Bead> beads;
 
+		// The parameters that govern how the simulation behaves
 		SimulationParams params;
 
 	};

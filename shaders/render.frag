@@ -7,7 +7,7 @@ layout(location = 0) out vec4 o_color;
 
 in VS_OUT
 {
-    flat vec3 color;
+    vec3 color;
     vec4 light_space_position;
 } fs_in;
 
@@ -26,9 +26,9 @@ void main()
 		float current = projection_space_coordinates.z;
 
 		// Filtering
-		const float bias = 0.025;
+		const float bias = 0.015;
 		const vec2 texel_size = 1.0 / textureSize(u_depth_map, 0);
-		const int kernel_steps = 10;
+		const int kernel_steps = 12;
 		for(int x = -kernel_steps; x <= kernel_steps; ++x)
 		{
 		    for(int y = -kernel_steps; y <= kernel_steps; ++y)
@@ -43,6 +43,12 @@ void main()
 
 		// Prevent shadows from being 100% black
 		shadow = min(shadow, 0.3);
+
+		// keep the shadow at 0.0 when outside the far_plane region of the light's frustum.
+	    if(projection_space_coordinates.z > 1.0)
+	    {
+	        shadow = 0.0;
+	    }
 	}
 
 	o_color = vec4(fs_in.color * (1.0 - shadow), 1.0);

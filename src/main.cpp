@@ -28,6 +28,8 @@ const uint32_t window_w = 1200;
 const uint32_t window_h = 800;
 const uint32_t ui_w = 256;
 const uint32_t ui_h = 256;
+const uint32_t depth_w = 1024;
+const uint32_t depth_h = 1024;
 bool first_mouse = true;
 float last_x;
 float last_y;
@@ -518,7 +520,7 @@ int main()
         // Create a color attachment texture and associate it with the framebuffer
         const float border[] = { 1.0, 1.0, 1.0, 1.0 };
         glCreateTextures(GL_TEXTURE_2D, 1, &texture_depth);
-        glTextureStorage2D(texture_depth, 1, GL_DEPTH_COMPONENT32F, window_w, window_h);
+        glTextureStorage2D(texture_depth, 1, GL_DEPTH_COMPONENT32F, depth_w, depth_h);
         glTextureParameteri(texture_depth, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTextureParameteri(texture_depth, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTextureParameteri(texture_depth, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
@@ -779,11 +781,10 @@ int main()
                 // Update draw data if necessary
                 if (topology_needs_update)
                 {
-                    std::cout << "Updating knot...\n";
+                    history.push("Updating knot...", utils::MessageType::INFO);
 
                     // Rebuild the curve that corresponds to this diagram
                     curve = diagram.generate_curve();
-                    //urve = curve.refine(0.75f);
 
                     // Rebuild the knot
                     knot = knot::Knot{ curve };
@@ -888,21 +889,27 @@ int main()
 
                 const auto stuck = knot.get_stuck();
                 glNamedBufferSubData(vbo_curve_stuck, 0, sizeof(int32_t) * stuck.size(), stuck.data());
-               
             }
 
             // Setup faux light position, projection matrix, etc.
-            const glm::vec3 light_position{ -2.0f, 2.0f, 5.0f };
+            const glm::vec3 light_position{ 0.0f, 0.0f, 10.0f };
             const float near_plane = 0.0f;
             const float far_plane = 20.0f;
-            const float ortho_width = 30.0f;
+            const float ortho_width = 20.0f;
             const auto light_projection = glm::ortho(-ortho_width, ortho_width, -ortho_width, ortho_width, near_plane, far_plane);
             const auto light_view = glm::lookAt(light_position, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
             const auto light_space_matrix = light_projection * light_view;
 
+            // Make sure the knot is always centered
+            const auto bounds = knot.get_rope().get_bounds();
+            const auto size_of_bounds = bounds.get_size();
+            const auto center_of_bounds = bounds.get_center();
+            glm::mat4 translate_center = glm::mat4{ 1.0f };
+            translate_center = glm::translate(translate_center, -center_of_bounds);
+
            // Render pass #1: render depth
            {
-               glViewport(0, 0, window_w, window_h);
+               glViewport(0, 0, depth_w, depth_h);
                glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_depth);
 
                // Clear the depth attachment (there are no color attachments)
@@ -912,7 +919,7 @@ int main()
                // Draw the knot
                shader_depth.use();
                shader_depth.uniform_mat4("u_light_space_matrix", light_space_matrix);
-               shader_depth.uniform_mat4("u_model", arcball_model_matrix);
+               shader_depth.uniform_mat4("u_model", arcball_model_matrix * translate_center);
                glBindVertexArray(vao_tube);
                glDrawArrays(GL_TRIANGLES, 0, tube.size());
                
@@ -922,7 +929,7 @@ int main()
            // Render pass #2: draw scene with shadows
            {
                glViewport(0, 0, window_w, window_h);
-
+           
                glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -943,7 +950,8 @@ int main()
                shader_draw.uniform_float("u_time", glfwGetTime());
                shader_draw.uniform_mat4("u_projection", projection);
                shader_draw.uniform_mat4("u_view", arcball_camera_matrix);
-               shader_draw.uniform_mat4("u_model", arcball_model_matrix);
+               shader_draw.uniform_mat4("u_model", arcball_model_matrix * translate_center);
+               shader_draw.uniform_vec3("u_size_of_bounds", size_of_bounds);
                glBindVertexArray(vao_tube);
                glDrawArrays(GL_TRIANGLES, 0, tube.size());
            }
