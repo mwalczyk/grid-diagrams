@@ -290,34 +290,6 @@ void draw_diagram(const knot::Diagram& diagram)
         }
     }
 
-    
-    
-
-    //const auto tilesetImagePos = ImGui::GetCursorScreenPos();
-
-    //// draw grid
-    //auto draw_list = ImGui::GetWindowDrawList();
-
-    //const auto tileSize = static_cast<float>(8.0f);
-    //const auto xTiles = static_cast<int>(diagram.get_number_of_cols());
-    //const auto yTiles = static_cast<int>(diagram.get_number_of_rows());
-
-    //// draw horizontal lines
-    //for (int x = 0; x < xTiles + 1; ++x) 
-    //{
-    //    draw_list->AddLine(ImVec2(tilesetImagePos.x + x * tileSize, tilesetImagePos.y),
-    //        ImVec2(tilesetImagePos.x + x * tileSize, tilesetImagePos.y + yTiles * tileSize),
-    //        ImColor(255, 255, 255));
-    //}
-
-    //// draw vertical lines
-    //for (int y = 0; y < yTiles + 1; ++y) 
-    //{
-    //    draw_list->AddLine(ImVec2(tilesetImagePos.x, tilesetImagePos.y + y * tileSize),
-    //        ImVec2(tilesetImagePos.x + xTiles * tileSize, tilesetImagePos.y + y * tileSize),
-    //        ImColor(255, 255, 255));
-    //}
-
     // Check input
     if (ImGui::IsItemHovered()) 
     {
@@ -556,10 +528,8 @@ int main()
         ImGuiIO& io = ImGui::GetIO();
         input_data.imgui_active = io.WantCaptureMouse;
 
-        // Poll regular GLFW window events
+        // Poll regular GLFW window events and start the ImGui frame
         glfwPollEvents();
-
-        // Start the ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
@@ -659,6 +629,7 @@ int main()
             {
                 ImGui::Begin("Grid Diagram");
 
+                // Draw grid cell buttons
                 draw_diagram(diagram);
                 
                 // Drop-down menu for selecting a Cromwell move
@@ -788,7 +759,6 @@ int main()
                             history.push(e.get_message(), utils::MessageType::ERROR);
                         }
                     }
-
                 }
 
                 // Update draw data if necessary
@@ -816,7 +786,6 @@ int main()
 
                 ImGui::End();
             }
-            
         }
         
         ImGui::Render();

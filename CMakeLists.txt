@@ -8,7 +8,7 @@ project(grid_diagrams)
 if(MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
 else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -std=c++11")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic")
 endif()
 
 # setup GLFW CMake project
@@ -34,9 +34,16 @@ source_group("external" FILES ${IMGUI_SOURCES} ${GLAD_SOURCES})
 
 # create the executable
 add_executable(grid_diagrams ${PROJECT_SOURCES}
-					${PROJECT_HEADERS} # if not included here, it won't show up in the IDE?
-					${IMGUI_SOURCES}
-					${GLAD_SOURCES})
+							 ${PROJECT_HEADERS} # if not included here, it won't show up in the IDE?
+							 ${IMGUI_SOURCES}
+							 ${GLAD_SOURCES})
 
 # add libraries
 target_link_libraries(grid_diagrams glfw ${GLFW_LIBRARIES})
+
+# force C++17
+set_target_properties(grid_diagrams PROPERTIES CXX_STANDARD 17)
+
+if(MSVC)
+	set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT grid_diagrams)
+endif()

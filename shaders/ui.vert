@@ -28,18 +28,18 @@ void main()
     // Convert the vertex ID to a unique color
     vs_out.color = hsv_to_rgb(vec3(float(gl_VertexID) / u_number_of_vertices, 1.0, 1.0));
 
+    // Vertices that are "stuck" will be rendered as red
     const vec3 stuck_color = vec3(1.0, 0.0, 0.0);
     const vec3 unstuck_color = vec3(1.0);
+    
     if (i_stuck == 1)
     {
     	vs_out.color = stuck_color;
-    	gl_PointSize = 16.0;
+    	gl_PointSize = 20.0;
     }
     else
     {
     	vs_out.color = unstuck_color;
     	gl_PointSize = 16.0;
     }
-
-    //vs_out.color = vec3(i_stuck);
 }

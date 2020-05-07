@@ -25,6 +25,8 @@ void main()
 {
     gl_Position = u_projection * u_view * u_model * vec4(i_position, 1.0);
 
+    // Set the color based on the (normalized) coordinates of this vertex
     vs_out.color = (i_position / u_size_of_bounds) * 0.5 + 0.5;
+    
     vs_out.light_space_position = u_light_space_matrix * u_model * vec4(i_position, 1.0);
 }
