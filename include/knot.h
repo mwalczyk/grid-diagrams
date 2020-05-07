@@ -82,13 +82,11 @@ namespace knot
 			// Set new position: each particle can travel (at most) `d_max` units each time step
 			const auto clamped = glm::length(velocity) > params.d_max ? glm::normalize(velocity) * params.d_max : velocity;
 			position += clamped;
-
-			// TODO: prevent segments from intersecting
-			// ...
 		}
 
 	private:
 
+		// The position of the bead in 3-space, previous frame
 		glm::vec3 prev_position;
 
 		// The position of the bead in 3-space
@@ -129,9 +127,10 @@ namespace knot
 	}
 
 	/// A struct representing a knot, which is a curve embedded in 3-dimensional space
-	/// with a particular set of over- / under-crossings. In this program, a "knot" also
-	/// refers to a dynamical model, where the underlying curve is treated as a mass-spring
-	/// system.
+	/// with a particular set of over- / under-crossings
+	///
+	/// In this program, a "knot" also refers to a dynamical model, where the underlying 
+	/// curve is treated as a mass-spring system
 	class Knot
 	{
 
@@ -147,7 +146,7 @@ namespace knot
 			// Initialize beads
 			for (size_t i = 0; i < rope.get_number_of_vertices(); ++i)
 			{
-				auto [l, r] = rope.get_neighboring_indices_wrapped(i);
+				const auto [l, r] = rope.get_neighboring_indices_wrapped(i);
 
 				beads.push_back(Bead{ rope.get_vertices()[i], i, l, r });
 			}
@@ -175,7 +174,8 @@ namespace knot
 				auto force = glm::vec3{};
 
 				// Iterate over all potential neighbors
-				for (auto& other : beads) {
+				for (auto& other : beads) 
+				{
 
 					// Don't accumulate forces on itself
 					if (other != bead)
@@ -198,8 +198,8 @@ namespace knot
 						}
 						else
 						{
-							// This is NOT a neighboring bead: calculate the (repulsive) electrostatic force
-							auto direction = bead.position - other.position; // Reversed direction
+							// This is NOT a neighboring bead: calculate the (repulsive) electrostatic force - notice the direction vector is reversed!
+							auto direction = bead.position - other.position; 
 							auto r = glm::length(direction);
 							direction = glm::normalize(direction);
 
@@ -269,13 +269,14 @@ namespace knot
 		{
 			rope = anchors;
 
-			for (size_t i = 0; i < beads.size(); i++)
+			for (size_t i = 0; i < beads.size(); ++i)
 			{
 				beads[i].position = anchors.get_vertices()[i];
 				beads[i].is_stuck = false;
 			}
 		}
 
+		/// Returns a vector containing one integer per bead: 1 if the bead is stuck, 0 if it isn't
 		std::vector<int32_t> get_stuck() const
 		{
 			std::vector<int32_t> stuck;
@@ -291,8 +292,7 @@ namespace knot
 		std::vector<glm::vec3> gather_position_data() const
 		{
 			std::vector<glm::vec3> positions;
-			std::transform(beads.begin(), beads.end(), std::back_inserter(positions),
-				[](Bead bead) -> glm::vec3 {
+			std::transform(beads.begin(), beads.end(), std::back_inserter(positions), [](Bead bead) -> glm::vec3 {
 				return bead.position; 
 			});
 

@@ -2,7 +2,7 @@
 ➰ A program for manipulating and playing with knot diagrams.
 
 <p align="center">
-  <img src="https://github.com/mwalczyk/knots/blob/master/screenshots/knots.png" alt="screenshot" width="400" height="auto"/>
+  <img src="https://github.com/mwalczyk/grid-diagrams/blob/master/screenshots/screenshot.png" alt="screenshot" width="400" height="auto"/>
 </p>
 
 ## Description

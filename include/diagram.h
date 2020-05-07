@@ -12,6 +12,16 @@
 namespace knot
 {
 
+	// Abstract base class representing any type that can generate / build a knotted curve
+	class Generator
+	{
+
+	public:
+
+		virtual geom::PolygonalCurve generate_curve() const = 0;
+
+	};
+
 	// A direction (up, down, left, or right)
 	enum class Direction
 	{
@@ -66,8 +76,8 @@ namespace knot
 
 	};
 
-	/// A struct representing a grid diagram corresponding to a particular knot (or the unknot).
-	class Diagram
+	/// A struct representing a grid diagram corresponding to a particular knot (or the unknot)
+	class Diagram: Generator
 	{
 
 	public:
@@ -215,27 +225,24 @@ namespace knot
 			// The cardinal directions below designate the corner of the new 2x2 sub-grid
 			// that contains a "blank" cell (i.e. where the original `x` resided, for an
 			// x-stabilization)
-			switch (cardinal)
+			if (cardinal == Cardinal::NW || cardinal == Cardinal::SW)
 			{
-			case Cardinal::NW:
-			case Cardinal::SW:
 				// Insert a blank column to the R of the column in question
 				for (auto& row : data)
 				{
 					row.insert(row.begin() + j + 1, Entry::BLANK);
 				}
-				break;
-			default:
-				// NE or SE
+			}
+			else // NE or SE
+			{
 				// Insert a blank column to the L of the column in question
 				for (auto& row : data)
 				{
 					row.insert(row.begin() + j + 0, Entry::BLANK);
 				}
-				break;
 			}
 
-			std::vector<Entry> extra_row(data.size(), Entry::BLANK);
+			std::vector<Entry> extra_row(data[0].size(), Entry::BLANK);
 
 			switch (cardinal)
 			{
@@ -278,9 +285,10 @@ namespace knot
 			}
 		}
 
+		/// A move that removes ("flattens") a 2x2 sub-grid
 		void apply_destabilization()
 		{
-
+			throw std::runtime_error("Unimplemented");
 		}
 
 		/// Returns a reference to this diagram's underlying data store
@@ -334,8 +342,8 @@ namespace knot
 		/// Finds the indices of the `x` / `o` that occur in the specified row (or col)
 		std::pair<size_t, size_t> find_indices_of_xo(Axis axis, size_t index) const
 		{
-			auto x = find_index_of_first(axis, index, Entry::X);
-			auto o = find_index_of_first(axis, index, Entry::O);
+			const auto x = find_index_of_first(axis, index, Entry::X);
+			const auto o = find_index_of_first(axis, index, Entry::O);
 			return { x, o };
 		}
 
@@ -344,12 +352,12 @@ namespace knot
 		{
 			if (axis == Axis::ROW)
 			{
-				auto row = get_row(index);
+				const auto row = get_row(index);
 				return std::distance(row.begin(), std::find(row.begin(), row.end(), entry));
 			}
 			else
 			{
-				auto col = get_col(index);
+				const auto col = get_col(index);
 				return std::distance(col.begin(), std::find(col.begin(), col.end(), entry));
 			}
 		}
@@ -370,12 +378,12 @@ namespace knot
 				std::swap(b_start, b_end);
 			}
 
-			if (a_start > b_start&& a_end < b_end)
+			if (a_start > b_start && a_end < b_end)
 			{
 				// `a` is completely contained in `b`
 				return false;
 			}
-			else if (b_start > a_start&& b_end < a_end)
+			else if (b_start > a_start && b_end < a_end)
 			{
 				// `b` is completely contained in `a`
 				return false;
@@ -403,7 +411,7 @@ namespace knot
 		}
 
 		/// Generates a polygonal curve (polyline) that represents the topological structure of this grid diagram
-		geom::PolygonalCurve generate_curve() const
+		geom::PolygonalCurve generate_curve() const override
 		{
 			// First, get the row or column corresponding to the index where the last
 			// row or column ended
@@ -412,10 +420,15 @@ namespace knot
 			//
 			// Cols are connected: x -> o
 			// Rows are connected: o -> x
+			//
+			// We use the convention that vertical strands always cross OVER horizontal
+			// strands
 			auto [s, e] = find_indices_of_xo(Axis::COL, 0);
 			auto tie = s;
 
-			std::vector<size_t> indices = {
+			// Absolute indices of all of the grid cells that form the "path" of this knot
+			std::vector<size_t> indices = 
+			{
 				convert_to_absolute_index(s, 0),
 				convert_to_absolute_index(e, 0)
 			};
@@ -430,7 +443,7 @@ namespace knot
 				// - We just found an `x` (in the last row), so find the `o` in this column
 				const size_t next_index = traverse_horizontal ? find_index_of_first(Axis::ROW, e, Entry::X) : find_index_of_first(Axis::COL, e, Entry::O);
 
-				// Convert the above index to absolute indices that range from `[0..(self.resolution * self.resolution)]`,
+				// Convert the above index to absolute indices that range from `0..data.size()^2`,
 				// taking care to modify the function parameters based on the current orientation (horizontal / vertical)
 				const size_t absolute_index = traverse_horizontal ? convert_to_absolute_index(e, next_index) : convert_to_absolute_index(next_index, e);
 
@@ -446,6 +459,7 @@ namespace knot
 					keep_going = false;
 				}
 
+				// Set "start" and "end"
 				s = e;
 				e = next_index;
 
@@ -453,9 +467,14 @@ namespace knot
 				traverse_horizontal = !traverse_horizontal;
 			}
 
-			for (const auto& index : indices)
+			std::cout << "Indices (before inserting crossings): ";
+			for (size_t i = 0; i < indices.size(); ++i)
 			{
-				std::cout << index << ", ";
+				std::cout << indices[i];
+				if (i != indices.size() - 1)
+				{
+					std::cout << ", ";
+				}
 			}
 			std::cout << std::endl;
 
@@ -479,8 +498,8 @@ namespace knot
 			// and "lift" this vertex (or vertices) along the z-axis
 			std::vector<size_t> lifted;
 
-			const size_t num_col_chunks = static_cast<size_t>(cols.size() / 2);
-			const size_t num_row_chunks = static_cast<size_t>(rows.size() / 2);
+			const auto num_col_chunks = static_cast<size_t>(cols.size() / 2);
+			const auto num_row_chunks = static_cast<size_t>(rows.size() / 2);
 
 			for (size_t i = 0; i < num_col_chunks; ++i)
 			{
@@ -498,8 +517,8 @@ namespace knot
 					oriented_upwards = true;
 				}
 
-				auto [cs_i, cs_j] = convert_to_grid_indices(col_s);
-				auto [ce_i, ce_j] = convert_to_grid_indices(col_e);
+				const auto [cs_i, cs_j] = convert_to_grid_indices(col_s);
+				const auto [ce_i, ce_j] = convert_to_grid_indices(col_e);
 
 				// A list of all intersections along this column
 				std::vector<std::pair<size_t, size_t>> intersections;
@@ -514,13 +533,14 @@ namespace knot
 						std::swap(row_s, row_e);
 					}
 
-					auto [rs_i, rs_j] = convert_to_grid_indices(row_s);
-					auto [re_i, re_j] = convert_to_grid_indices(row_e);
+					const auto [rs_i, rs_j] = convert_to_grid_indices(row_s);
+					const auto [re_i, re_j] = convert_to_grid_indices(row_e);
 
 					if (cs_j > rs_j&& cs_j < re_j && cs_i < rs_i && ce_i > rs_i)
 					{
-						size_t intersect = convert_to_absolute_index(rs_i, cs_j);
+						const size_t intersect = convert_to_absolute_index(rs_i, cs_j);
 						intersections.push_back({ rs_i, intersect });
+
 						lifted.push_back(intersect);
 					}
 				}
@@ -550,9 +570,14 @@ namespace knot
 				}
 			}
 
-			for (const auto& index : indices)
+			std::cout << "Indices (after inserting crossings): ";
+			for (size_t i = 0; i < indices.size(); ++i)
 			{
-				std::cout << index << ", ";
+				std::cout << indices[i];
+				if (i != indices.size() - 1)
+				{
+					std::cout << ", ";
+				}
 			}
 			std::cout << std::endl;
 
@@ -566,8 +591,8 @@ namespace knot
 			// world-space width and height of the 3D grid are automatically
 			// set to the resolution of the diagram so that each grid "cell"
 			// is unit width / height
-			float w = static_cast<float>(data.size());
-			float h = static_cast<float>(data.size());
+			const float w = static_cast<float>(data.size());
+			const float h = static_cast<float>(data.size());
 
 			static const float lift_amount = 1.0f;
 
@@ -575,9 +600,9 @@ namespace knot
 			// make sure that the center of the grid lies at the origin
 			auto get_coordinate = [&](size_t i, size_t j, bool lift)
 			{
-				float x = (j / static_cast<float>(data.size()))* w - 0.5f * w;
-				float y = h - (i / static_cast<float>(data.size())) * h - 0.5f * h;
-				float z = lift ? lift_amount : 0.0f;
+				const float x = (j / static_cast<float>(data.size()))* w - 0.5f * w;
+				const float y = h - (i / static_cast<float>(data.size())) * h - 0.5f * h;
+				const float z = lift ? lift_amount : 0.0f;
 
 				return glm::vec3{ x, y, z };
 			};
@@ -590,39 +615,8 @@ namespace knot
 				// Remember:
 				// `i` is the row, ranging from `[0..data.size()]`
 				// `j` is the col, ranging from `[0..data.size()]`
-				auto [i, j] = convert_to_grid_indices(absolute_index);
+				const auto [i, j] = convert_to_grid_indices(absolute_index);
 				std::cout << "Processing grid cell " << i << ", " << j << std::endl;
-
-				//bool lift_curr = std::count(lifted.begin(), lifted.end(), absolute_index);
-
-				//if (prev_indices.first != -1 && prev_indices.second != -1)
-				//{
-				//	auto [i_prev, j_prev] = prev_indices;
-				//	auto prev_absolute_index = convert_to_absolute_index(i_prev, j_prev);
-				//	bool lift_prev = std::count(lifted.begin(), lifted.end(), prev_absolute_index);
-
-				//	auto segment = geom::Segment{
-				//		get_coordinate(i_prev, j_prev, lift_prev),
-				//		get_coordinate(i, j, lift_curr)
-				//	};
-				//	float length = segment.length();
-				//	std::cout << "Length: " << length << "\n";
-				//	float slice = 0.5f;
-				//	size_t divs = static_cast<size_t>(floorf(length / slice));
-
-				//	for (size_t s = 1; s < divs; s++)
-				//	{
-				//		points.push_back(segment.point_at( (s * slice) / length ));
-				//	}
-
-				//}
-				//else
-				//{
-
-				//}
-				//auto coord = get_coordinate(i, j, lift_curr);
-				//points.push_back(coord);
-				//prev_indices = { i, j };
 
 				if (prev_indices.first != -1 && prev_indices.second != -1)
 				{
@@ -674,8 +668,8 @@ namespace knot
 
 				// World-space position of the vertex corresponding to this grid index:
 				// make sure that the center of the grid lies at the origin
-				bool lift = std::count(lifted.begin(), lifted.end(), absolute_index);
-				auto coord = get_coordinate(i, j, lift);
+				const bool lift = std::count(lifted.begin(), lifted.end(), absolute_index);
+				const auto coord = get_coordinate(i, j, lift);
 
 				points.push_back(coord);
 

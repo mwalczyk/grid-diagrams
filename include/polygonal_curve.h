@@ -80,14 +80,12 @@ namespace geom
 
 				if (sN < 0.0f)
 				{
-					// sc < 0 => the s = 0 edge is visible
 					sN = 0.0f;
 					tN = e;
 					tD = c;
 				}
 				else if (sN > sD)
 				{
-					// sc > 1  => the s = 1 edge is visible
 					sN = sD;
 					tN = e + b;
 					tD = c;
@@ -96,10 +94,7 @@ namespace geom
 
 			if (tN < 0.0f)
 			{
-				// tc < 0 => the t = 0 edge is visible
 				tN = 0.0f;
-
-				// Recompute `sc` for this edge
 				if (-d < 0.0f)
 				{
 					sN = 0.0f;
@@ -116,10 +111,7 @@ namespace geom
 			}
 			else if (tN > tD)
 			{
-				// tc > 1  => the t = 1 edge is visible
 				tN = tD;
-
-				// Recompute `sc` for this edge
 				if ((-d + b) < 0.0f) 
 				{
 					sN = 0.0;
@@ -186,6 +178,21 @@ namespace geom
 			
 			min_point = { min_x, min_y, min_z };
 			max_point = { max_x, max_y, max_z };
+		}
+
+		const glm::vec3& get_min() const
+		{
+			return min_point;
+		}
+
+		const glm::vec3& get_max() const
+		{
+			return max_point;
+		}
+
+		glm::vec3 get_diagonal() const
+		{
+			return min_point - max_point;
 		}
 
 		glm::vec3 get_center() const
@@ -281,6 +288,10 @@ namespace geom
 		/// to the last vertex.
 		glm::vec3 point_at(float t) const
 		{
+			// Clamp to range 0..1
+			t = fmin(t, 1.0f);
+			t = fmax(t, 0.0f);
+
 			// Short-cut: is this the first or last vertex of the curve?
 			if (t == 0.0f)
 			{
@@ -293,7 +304,7 @@ namespace geom
 
 			const auto desired_length = perimeter() * t;
 			auto traversed = 0.0f;
-			auto point = glm::vec3{ 10.0f, 0.0f, 0.0f };
+			auto point = glm::vec3{};
 
 			for (size_t i = 0; i < get_number_of_vertices(); ++i)
 			{
@@ -305,6 +316,7 @@ namespace geom
 					// We know that the point lies on this segment somewhere...
 					float along_segment = traversed - desired_length;
 					point = segment.point_at((segment.length() - along_segment) / segment.length());
+
 					break;
 				}
 			}
@@ -316,40 +328,9 @@ namespace geom
 		{
 			auto refined = PolygonalCurve{};
 
-			//float total_length = perimeter();
-			//for (float f = 0; f <= total_length; f += minimum_segment_length)
-			//{
-			//	float percent = f / total_length;
-			//	percent = fminf(percent, 1.0f);
-			//	//std::cout << percent << std::endl;
-			//	refined.push_vertex(point_at(percent));
-			//}
+			// TODO: previous ways of doing this didn't work - needs more R+D...
 
-			refined.push_vertex(vertices.back());
-
-			for (size_t i = 0; i < get_number_of_vertices() - 1; ++i)
-			{
-				const auto segment = get_segment(i);
-
-				// Add the first point
-				refined.push_vertex(segment.get_start());
-
-				// Calculate how many vertices we will need to add between the
-				// start and end points of the original, unrefined segment
-				size_t number_of_subdivisions = 4;
-				
-				// Add extra vertices
-				for (size_t division = 1; division < number_of_subdivisions; division++)
-				{
-					float t = static_cast<float>(division) / number_of_subdivisions;
-					refined.push_vertex(segment.point_at(t));
-				}
-
-				// Finally, add the second point
-				refined.push_vertex(segment.get_end());
-			}
-
-			return refined;
+			throw std::runtime_error("Unimplemented");
 		}
 
 		/// Deletes all of the vertices that make up this curve.

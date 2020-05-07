@@ -20,13 +20,13 @@
 struct InputData
 {
     bool imgui_active = false;
-};
+} input_data;
 
 // Viewport and camera settings
 const uint32_t window_w = 1200;
 const uint32_t window_h = 800;
-const uint32_t ui_w = 256;
-const uint32_t ui_h = 256;
+const uint32_t ui_w = 720;
+const uint32_t ui_h = 720;
 const uint32_t depth_w = 1024;
 const uint32_t depth_h = 1024;
 bool first_mouse = true;
@@ -42,20 +42,18 @@ bool simulation_active = false;
 // Appearance settings
 ImVec4 clear_color = ImVec4(0.208f, 0.256f, 0.373f, 1.0f);
 
+// File paths
 std::vector<std::string> available_csvs;
 std::string current_csv;
 
+// Cromwell move options
 std::vector<std::string> cromwell_moves = { "Translation", "Commutation", "Stabilization", "Destabilization" };
 std::string current_move = cromwell_moves[0];
-
 int commutation_row_or_col = 0;
 int commutation_index = 0;
-
 int stabilization_cardinal = 0;
 int stabilization_index_i = 0;
 int stabilization_index_j = 0;
-
-InputData input_data;
 
 GLFWwindow* window;
 
@@ -215,6 +213,9 @@ void message_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GL
     std::cout << src_str << ", " << type_str << ", " << severity_str << ", " << id << ": " << message << '\n';
 }
 
+/**
+ * Draw the UI elements corresponding to the specified grid diagram (i.e. a matrix of x's and o's).
+ */
 void draw_diagram(const knot::Diagram& diagram)
 {
     ImGui::Text("Grid diagram is %u x %u", diagram.get_number_of_rows(), diagram.get_number_of_cols());
@@ -327,6 +328,9 @@ void draw_diagram(const knot::Diagram& diagram)
     }
 }
 
+/**
+ * Initialize GLFW and the OpenGL context.
+ */
 void initialize()
 {
     // Create and configure the GLFW window 
@@ -383,7 +387,6 @@ void initialize()
 
         // Configure point and line size
         glLineWidth(8.0f);
-        glPointSize(16.0f);
         glEnable(GL_PROGRAM_POINT_SIZE);
     }
 }
@@ -404,97 +407,64 @@ void load_csvs()
 }
 
 uint32_t vao_tube;
-uint32_t vbo_tube;
+uint32_t vbo_tube_position;
 
 uint32_t vao_curve;
-uint32_t vbo_curve;
+uint32_t vbo_curve_position;
 uint32_t vbo_curve_stuck;
 
-void init_vaos()
-{
+uint32_t framebuffer_ui;
+uint32_t texture_ui;
+uint32_t renderbuffer_ui;
 
+uint32_t framebuffer_depth;
+uint32_t texture_depth;
+
+/**
+ * Build the VAOs and VBOs used for rendering.
+ */
+void build_vaos(const std::vector<glm::vec3>& tube_data,
+                const std::vector<glm::vec3>& curve_data,
+                const std::vector<int32_t>& stuck_data)
+{
+    // Initialize objects for rendering the tube mesh
+    glCreateVertexArrays(1, &vao_tube);
+
+    glCreateBuffers(1, &vbo_tube_position);
+    glNamedBufferStorage(vbo_tube_position, sizeof(glm::vec3) * tube_data.size(), tube_data.data(), GL_DYNAMIC_STORAGE_BIT);
+
+    glVertexArrayVertexBuffer(vao_tube, 0, vbo_tube_position, 0, sizeof(glm::vec3));
+    glEnableVertexArrayAttrib(vao_tube, 0);
+    glVertexArrayAttribFormat(vao_tube, 0, 3, GL_FLOAT, GL_FALSE, 0);
+    glVertexArrayAttribBinding(vao_tube, 0, 0);
+
+    // Initialize objects for rendering the curve mesh
+    glCreateVertexArrays(1, &vao_curve);
+
+    glCreateBuffers(1, &vbo_curve_position);
+    glNamedBufferStorage(vbo_curve_position, sizeof(glm::vec3) * curve_data.size(), curve_data.data(), GL_DYNAMIC_STORAGE_BIT);
+
+    glCreateBuffers(1, &vbo_curve_stuck);
+    glNamedBufferStorage(vbo_curve_stuck, sizeof(int32_t) * stuck_data.size(), stuck_data.data(), GL_DYNAMIC_STORAGE_BIT);
+
+    glVertexArrayVertexBuffer(vao_curve, 0, vbo_curve_position, 0, sizeof(glm::vec3));
+    glVertexArrayVertexBuffer(vao_curve, 1, vbo_curve_stuck, 0, sizeof(int32_t)); 
+
+    glEnableVertexArrayAttrib(vao_curve, 0);
+    glVertexArrayAttribFormat(vao_curve, 0, 3, GL_FLOAT, GL_FALSE, 0);
+    glVertexArrayAttribBinding(vao_curve, 0, 0);
+
+    glEnableVertexArrayAttrib(vao_curve, 1);
+    glVertexArrayAttribIFormat(vao_curve, 1, 1, GL_INT, 0); 
+    glVertexArrayAttribBinding(vao_curve, 1, 1);
 }
 
-int main()
+/**
+ * Build the FBOs used for rendering.
+ */
+void build_fbos()
 {
-    // Setup the GUI library + OpenGL, etc.
-    initialize();
-
-    // Load all of the grid diagram files
-    load_csvs();
-    if (available_csvs.size() == 0)
-    {
-        throw std::runtime_error("No .csv files found");
-    }
-    current_csv = available_csvs[0];
-
-    //auto segment_a = geom::Segment{ glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 1.0, 0.0) };
-    //auto segment_b = geom::Segment{ glm::vec3(0.0, 0.0, 1.0), glm::vec3(2.0, 0.0, 1.0) };
-
-    //auto shortest_distance = segment_a.shortest_distance_between(segment_b);
-    //assert(glm::length(shortest_distance), 1.0f);
-    //std::cout << "Test 0 length: " << glm::length(shortest_distance) << std::endl;
-
-
-    // Initialize the grid diagram
-    auto diagram = knot::Diagram{ current_csv };
-    auto curve = diagram.generate_curve();
-    auto knot = knot::Knot{ curve };
-    const size_t warmup_iterations = 3;
-    for (size_t i = 0; i < warmup_iterations; i++)
-    {
-        knot.relax();
-    }
-    auto tube = geom::generate_tube(knot.get_rope());
-
-    // Command log history messages
-    auto history = utils::History{};
-
-    // Load all of the relevant shader programs
-    auto shader_depth = graphics::Shader{ "../shaders/depth.vert", "../shaders/depth.frag" };
-    auto shader_draw = graphics::Shader{ "../shaders/render.vert", "../shaders/render.frag" };
-    auto shader_ui = graphics::Shader{ "../shaders/ui.vert", "../shaders/ui.frag" };
-
-    // Create VAOs, VBOs, etc.
-    {
-        glCreateVertexArrays(1, &vao_tube);
-
-        glCreateBuffers(1, &vbo_tube);
-        glNamedBufferStorage(vbo_tube, sizeof(glm::vec3) * tube.size(), tube.data(), GL_DYNAMIC_STORAGE_BIT);
-
-        glVertexArrayVertexBuffer(vao_tube, 0, vbo_tube, 0, sizeof(glm::vec3));
-        glEnableVertexArrayAttrib(vao_tube, 0);
-        glVertexArrayAttribFormat(vao_tube, 0, 3, GL_FLOAT, GL_FALSE, 0);
-        glVertexArrayAttribBinding(vao_tube, 0, 0);
-    }
-
-    {
-        glCreateVertexArrays(1, &vao_curve);
-
-        glCreateBuffers(1, &vbo_curve);
-        glNamedBufferStorage(vbo_curve, sizeof(glm::vec3) * curve.get_number_of_vertices(), curve.get_vertices().data(), GL_DYNAMIC_STORAGE_BIT);
-
-        const auto stuck = knot.get_stuck();
-        glCreateBuffers(1, &vbo_curve_stuck);
-        glNamedBufferStorage(vbo_curve_stuck, sizeof(int32_t) * stuck.size(), stuck.data(), GL_DYNAMIC_STORAGE_BIT);
-
-        // Bind a buffer to a vertex buffer bind point
-        glVertexArrayVertexBuffer(vao_curve, 0, vbo_curve, 0, sizeof(glm::vec3));
-        glVertexArrayVertexBuffer(vao_curve, 1, vbo_curve_stuck, 0, sizeof(int32_t)); // vao, binding, buffer, offset, stride
-
-        glEnableVertexArrayAttrib(vao_curve, 0);
-        glVertexArrayAttribFormat(vao_curve, 0, 3, GL_FLOAT, GL_FALSE, 0);
-        glVertexArrayAttribBinding(vao_curve, 0, 0);
-
-        glEnableVertexArrayAttrib(vao_curve, 1);
-        glVertexArrayAttribIFormat(vao_curve, 1, 1, GL_INT, 0); // vao, attrib, size, type, offset
-        glVertexArrayAttribBinding(vao_curve, 1, 1); // vao, attrib, binding
-    }
-
     // Create the offscreen framebuffer that we will render the S2 sphere into
-    uint32_t framebuffer_ui;
-    uint32_t texture_ui;
-    uint32_t renderbuffer_ui;
     {
         glCreateFramebuffers(1, &framebuffer_ui);
 
@@ -519,8 +489,6 @@ int main()
     }
 
     // Create the offscreen framebuffer that we will render depth into (for shadow mapping)
-    uint32_t framebuffer_depth;
-    uint32_t texture_depth;
     {
         glCreateFramebuffers(1, &framebuffer_depth);
 
@@ -544,6 +512,43 @@ int main()
             std::cerr << "Error: framebuffer is not complete\n";
         }
     }
+}
+
+int main()
+{
+    // Setup the GUI library + OpenGL, etc.
+    initialize();
+
+    // Load all of the grid diagram files
+    load_csvs();
+    if (available_csvs.size() == 0)
+    {
+        throw std::runtime_error("No .csv files found");
+    }
+    current_csv = available_csvs[0];
+
+    // Initialize the grid diagram
+    auto diagram = knot::Diagram{ current_csv };
+    auto curve = diagram.generate_curve();
+    auto knot = knot::Knot{ curve };
+    const size_t warmup_iterations = 3;
+    for (size_t i = 0; i < warmup_iterations; i++)
+    {
+        knot.relax();
+    }
+    auto tube = geom::generate_tube(knot.get_rope());
+
+    // Command log history messages
+    auto history = utils::History{};
+
+    // Load all of the relevant shader programs
+    auto shader_depth = graphics::Shader{ "../shaders/depth.vert", "../shaders/depth.frag" };
+    auto shader_draw = graphics::Shader{ "../shaders/render.vert", "../shaders/render.frag" };
+    auto shader_ui = graphics::Shader{ "../shaders/ui.vert", "../shaders/ui.frag" };
+
+    // Create VAOs, VBOs, FBOs, textures, etc.
+    build_vaos(tube, curve.get_vertices(), knot.get_stuck());
+    build_fbos();
 
     while (!glfwWindowShouldClose(window))
     {
@@ -599,7 +604,7 @@ int main()
                     }
                     ImGui::EndCombo();
                 }
-                ImGui::Image((void*)(intptr_t)texture_ui, ImVec2(ui_w, ui_h), ImVec2(1, 1), ImVec2(0, 0));
+                ImGui::Image((void*)(intptr_t)texture_ui, ImVec2(256, 256), ImVec2(1, 1), ImVec2(0, 0));
                 ImGui::Text("Number of Grid Points: %u", curve.get_number_of_vertices());
                 
                 // Knot relaxation physics simulation
@@ -796,52 +801,17 @@ int main()
 
                     // Rebuild the knot
                     knot = knot::Knot{ curve };
-
                     if (!simulation_active)
                     {
-                        for (size_t i = 0; i < warmup_iterations; i++)
+                        for (size_t i = 0; i < warmup_iterations; ++i)
                         {
                             knot.relax();
                         }
                     }
-                    
-                    // Rebuild VAO / VBO for tube mesh
                     tube = geom::generate_tube(knot.get_rope());
-                    glCreateVertexArrays(1, &vao_tube);
 
-                    glCreateBuffers(1, &vbo_tube);
-                    glNamedBufferStorage(vbo_tube, sizeof(glm::vec3) * tube.size(), tube.data(), GL_DYNAMIC_STORAGE_BIT);
-
-                    glVertexArrayVertexBuffer(vao_tube, 0, vbo_tube, 0, sizeof(glm::vec3));
-                    glEnableVertexArrayAttrib(vao_tube, 0);
-                    glVertexArrayAttribFormat(vao_tube, 0, 3, GL_FLOAT, GL_FALSE, 0); // Last item is the offset
-                    glVertexArrayAttribBinding(vao_tube, 0, 0);
-
-                    // Rebuild VAO / VBO for curve mesh
-                    glCreateVertexArrays(1, &vao_curve);
-
-                    // Rebuild buffer #0
-                    glCreateBuffers(1, &vbo_curve);
-                    glNamedBufferStorage(vbo_curve, sizeof(glm::vec3) * curve.get_number_of_vertices(), curve.get_vertices().data(), GL_DYNAMIC_STORAGE_BIT);
-                    
-                    // Rebuild buffer #1
-                    auto stuck = knot.get_stuck();
-                    glCreateBuffers(1, &vbo_curve_stuck);
-                    glNamedBufferStorage(vbo_curve_stuck, sizeof(int32_t)* stuck.size(), stuck.data(), GL_DYNAMIC_STORAGE_BIT);
-      
-                    // Bind a buffer to a vertex buffer bind point
-                    glVertexArrayVertexBuffer(vao_curve, 0, vbo_curve, 0, sizeof(glm::vec3));
-                    glVertexArrayVertexBuffer(vao_curve, 1, vbo_curve_stuck, 0, sizeof(int32_t)); 
-
-                    // Specify vertex attirbute #0
-                    glEnableVertexArrayAttrib(vao_curve, 0);
-                    glVertexArrayAttribFormat(vao_curve, 0, 3, GL_FLOAT, GL_FALSE, 0);
-                    glVertexArrayAttribBinding(vao_curve, 0, 0);
-
-                    // Specify vertex attirbute #1
-                    glEnableVertexArrayAttrib(vao_curve, 1);
-                    glVertexArrayAttribIFormat(vao_curve, 1, 1, GL_INT, 0); 
-                    glVertexArrayAttribBinding(vao_curve, 1, 1); 
+                    // Rebuild VAO / VBO for tube mesh
+                    build_vaos(tube, curve.get_vertices(), knot.get_stuck());
                 }
 
                 ImGui::End();
@@ -893,7 +863,7 @@ int main()
                 knot.relax();
 
                 tube = geom::generate_tube(knot.get_rope());
-                glNamedBufferSubData(vbo_tube, 0, sizeof(glm::vec3) * tube.size(), tube.data());
+                glNamedBufferSubData(vbo_tube_position, 0, sizeof(glm::vec3) * tube.size(), tube.data());
 
                 const auto stuck = knot.get_stuck();
                 glNamedBufferSubData(vbo_curve_stuck, 0, sizeof(int32_t) * stuck.size(), stuck.data());
@@ -963,13 +933,10 @@ int main()
                glBindVertexArray(vao_tube);
                glDrawArrays(GL_TRIANGLES, 0, tube.size());
            }
-
         }
 
         // Draw the ImGui window
-        {
-            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        }
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         glfwSwapBuffers(window);
     }
@@ -982,8 +949,9 @@ int main()
     // Delete OpenGL objects
     glDeleteVertexArrays(1, &vao_curve);
     glDeleteVertexArrays(1, &vao_tube);
-    glDeleteBuffers(1, &vbo_curve);
-    glDeleteBuffers(1, &vbo_tube);
+    glDeleteBuffers(1, &vbo_curve_position);
+    glDeleteBuffers(1, &vbo_curve_stuck);
+    glDeleteBuffers(1, &vbo_tube_position);
     glDeleteTextures(1, &texture_depth);
     glDeleteTextures(1, &texture_ui);
     glDeleteFramebuffers(1, &framebuffer_depth);
