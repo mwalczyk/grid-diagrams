@@ -13,7 +13,6 @@
 #include "diagram.h"
 #include "knot.h"
 #include "history.h"
-#include "mesh.h"
 #include "shader.h"
 #include "to_string.h"
 
@@ -404,6 +403,18 @@ void load_csvs()
     }
 }
 
+uint32_t vao_tube;
+uint32_t vbo_tube;
+
+uint32_t vao_curve;
+uint32_t vbo_curve;
+uint32_t vbo_curve_stuck;
+
+void init_vaos()
+{
+
+}
+
 int main()
 {
     // Setup the GUI library + OpenGL, etc.
@@ -444,8 +455,7 @@ int main()
     auto shader_draw = graphics::Shader{ "../shaders/render.vert", "../shaders/render.frag" };
     auto shader_ui = graphics::Shader{ "../shaders/ui.vert", "../shaders/ui.frag" };
 
-    uint32_t vao_tube;
-    uint32_t vbo_tube;
+    // Create VAOs, VBOs, etc.
     {
         glCreateVertexArrays(1, &vao_tube);
 
@@ -458,9 +468,6 @@ int main()
         glVertexArrayAttribBinding(vao_tube, 0, 0);
     }
 
-    uint32_t vao_curve;
-    uint32_t vbo_curve;
-    uint32_t vbo_curve_stuck;
     {
         glCreateVertexArrays(1, &vao_curve);
 
@@ -560,14 +567,12 @@ int main()
             {
                 ImGui::Begin("Settings");
 
-                // Change the background color
+                // Colors and FPS
                 ImGui::ColorEdit3("clear color", (float*)&clear_color);
-
-                // Add some basic performanace monitoring
                 ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-                ImGui::Separator();
 
-                // Create the drop-down menu for selecting a Cromwell move
+                // Drop-down menu for selecting a Cromwell move
+                ImGui::Separator();
                 if (ImGui::BeginCombo("Grid Diagram File", current_csv.c_str()))
                 {
                     for (size_t i = 0; i < available_csvs.size(); ++i)
@@ -594,21 +599,21 @@ int main()
                     }
                     ImGui::EndCombo();
                 }
-
-                // Draw the (un-extruded) knot
                 ImGui::Image((void*)(intptr_t)texture_ui, ImVec2(ui_w, ui_h), ImVec2(1, 1), ImVec2(0, 0));
                 ImGui::Text("Number of Grid Points: %u", curve.get_number_of_vertices());
                 
-                // Toggle the knot relaxation physics simulation
+                // Knot relaxation physics simulation
+                ImGui::Separator();
+                ImGui::Text("Simulation");
                 ImGui::Checkbox("Simulation Active", &simulation_active);
-
-                // Reset the simulation
                 if (ImGui::Button("Reset Simulation"))
                 {
                     knot.reset();
                 }
-
+        
                 // Simulation params
+                ImGui::Separator();
+                ImGui::Text("Simulation Parameters");
                 ImGui::SliderFloat("Damping", &knot.get_simulation_params().damping, 0.1f, 0.75f);
                 ImGui::SliderFloat("Anchor Weight", &knot.get_simulation_params().anchor_weight, 0.0f, 0.5f);
                 ImGui::SliderFloat("Beta", &knot.get_simulation_params().beta, 1.0f, 5.0f);
@@ -616,7 +621,9 @@ int main()
                 ImGui::SliderFloat("Alpha", &knot.get_simulation_params().alpha, 1.0f, 5.0f);
                 ImGui::SliderFloat("K", &knot.get_simulation_params().k, 0.0f, 15.0f);
 
-                // Add console log information
+                // Console log information
+                ImGui::Separator();
+                ImGui::Text("Log");
                 const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
                 ImGui::BeginChild("ScrollingRegion", ImVec2(0, -footer_height_to_reserve), false, ImGuiWindowFlags_HorizontalScrollbar);
                 for (const auto& item : history.get_messages())
@@ -649,7 +656,8 @@ int main()
 
                 draw_diagram(diagram);
                 
-                // Create the drop-down menu for selecting a Cromwell move
+                // Drop-down menu for selecting a Cromwell move
+                ImGui::Text("Cromwell Moves");
                 if (ImGui::BeginCombo("Cromwell", current_move.c_str()))
                 {
                     for (size_t i = 0; i < cromwell_moves.size(); ++i)
@@ -668,7 +676,7 @@ int main()
                     ImGui::EndCombo();
                 }
 
-                // Create extra UI elements depending on the edit mode
+                // Extra UI elements (based on current edit mode)
                 if (current_move == "Translation")
                 {
                     auto direction_message = "";

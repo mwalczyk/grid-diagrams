@@ -566,13 +566,13 @@ namespace knot
 			// world-space width and height of the 3D grid are automatically
 			// set to the resolution of the diagram so that each grid "cell"
 			// is unit width / height
-
-			//auto curve = geom::PolygonalCurve();
 			float w = static_cast<float>(data.size());
 			float h = static_cast<float>(data.size());
 
 			static const float lift_amount = 1.0f;
 
+			// World-space position of the vertex corresponding to this grid index:
+			// make sure that the center of the grid lies at the origin
 			auto get_coordinate = [&](size_t i, size_t j, bool lift)
 			{
 				float x = (j / static_cast<float>(data.size()))* w - 0.5f * w;
@@ -593,13 +593,44 @@ namespace knot
 				auto [i, j] = convert_to_grid_indices(absolute_index);
 				std::cout << "Processing grid cell " << i << ", " << j << std::endl;
 
+				//bool lift_curr = std::count(lifted.begin(), lifted.end(), absolute_index);
+
+				//if (prev_indices.first != -1 && prev_indices.second != -1)
+				//{
+				//	auto [i_prev, j_prev] = prev_indices;
+				//	auto prev_absolute_index = convert_to_absolute_index(i_prev, j_prev);
+				//	bool lift_prev = std::count(lifted.begin(), lifted.end(), prev_absolute_index);
+
+				//	auto segment = geom::Segment{
+				//		get_coordinate(i_prev, j_prev, lift_prev),
+				//		get_coordinate(i, j, lift_curr)
+				//	};
+				//	float length = segment.length();
+				//	std::cout << "Length: " << length << "\n";
+				//	float slice = 0.5f;
+				//	size_t divs = static_cast<size_t>(floorf(length / slice));
+
+				//	for (size_t s = 1; s < divs; s++)
+				//	{
+				//		points.push_back(segment.point_at( (s * slice) / length ));
+				//	}
+
+				//}
+				//else
+				//{
+
+				//}
+				//auto coord = get_coordinate(i, j, lift_curr);
+				//points.push_back(coord);
+				//prev_indices = { i, j };
+
 				if (prev_indices.first != -1 && prev_indices.second != -1)
 				{
 					if (prev_indices.first == i)
 					{
 						std::cout << "\tAdding new points along row\n";
 						// Curr and prev are part of the same row - add "filler" points along row (`j`)
-						
+
 						if (prev_indices.second > j)
 						{
 							// The prev cell is D from curr cell
@@ -649,7 +680,6 @@ namespace knot
 				points.push_back(coord);
 
 				prev_indices = { i, j };
-
 			}
 
 			points.pop_back();

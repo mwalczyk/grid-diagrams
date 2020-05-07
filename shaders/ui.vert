@@ -33,7 +33,7 @@ void main()
     if (i_stuck == 1)
     {
     	vs_out.color = stuck_color;
-    	gl_PointSize = 32.0;
+    	gl_PointSize = 16.0;
     }
     else
     {
