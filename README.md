@@ -21,6 +21,10 @@ In practice, we can traverse the diagram by starting with the `x` in the left-mo
 
 Following the procedure outlined above results in a piecewise linear link (polyline). To obtain a "smoother" projection of the knot (one without sharp corners), we need to perform some form of topological refinement, taking care to not change the underlying structure of the knot. Following Dr. Scharein's thesis (link below), each vertex of the polyline is treated as a particle in a physics simulation. Adjacent particles are attracted to one another via a mechanical spring force. Non-adjacent particles are repelled from one another via an electrostatic force, which (in practice) prevents segments from crossing over or under one another. Additionally, we perform intersection tests between all pairs of non-neighboring line segments to prevent any "illegal" crossings. This is why we "lift" vertices at all of the crossings when we pre-process the grid diagram.
 
+<p align="center">
+  <img src="https://github.com/mwalczyk/grid-diagrams/blob/master/screenshots/unwinding.gif" alt="screenshot" width="400" height="auto"/>
+</p>
+
 The relaxation is fairly dependent on both the settings of the simulation parameters as well as the density of the underlying polygonal curve. One TODO item is to investigate more robust ways of resampling a polyline.
 
 Before the knot is rendered, a path-guided extrusion is performed to "thicken" the knot. At each vertex along the polyline, a coordinate frame is established by calculating the tangent vector and a vector orthogonal to the tangent. Then, a circular cross-section is added at the origin of this new, local coordinate system. Adjacent cross-sections are connected with triangles to form a continuous, closed "tube." To avoid jarring rotations, [parallel transport](https://en.wikipedia.org/wiki/Parallel_transport) is employed. Essentially, each successive coordinate frame is calculated with respect to the previous frame. This ensures that the circular cross-sections smoothly rotate around the polyline during traversal.  
