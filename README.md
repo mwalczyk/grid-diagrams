@@ -71,7 +71,7 @@ o, , ,x,
  ,o, , ,x
 ```
 
-New diagrams can be added to the `diagrams` folder at the top-level of this repository. 
+New diagrams can be added to the `diagrams` folder at the top-level of this repository. A bunch of example diagrams can be found in the follow [paper](https://services.math.duke.edu/~ng/atlas/Chongchitmate.pdf) written by Wutichai Chongchitmate titled "Classification of Legendrian Knots and Links."
 
 ## To Do
 - [ ] Add bounding box checks (see section `7.2.2` of Scharein's thesis) to accelerate segment-segment intersection tests
