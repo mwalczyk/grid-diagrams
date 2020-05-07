@@ -214,17 +214,18 @@ namespace knot
 			}
 		}
 
-		/// A move that replaces an `x` with a 2x2 sub-grid
+		/// A move that replaces a non-"blank" entry with a 2x2 sub-grid
 		void apply_stabilization(Cardinal cardinal, size_t i, size_t j)
 		{
-			if (data[i][j] != Entry::X)
+			auto original_entry = data[i][j];
+
+			if (data[i][j] == Entry::BLANK)
 			{
-				throw CromwellException("There is no `x` at the specified grid position: stabilization cannot be performed");
+				throw CromwellException("There is no `x` or `o` at the specified grid position: stabilization cannot be performed");
 			}
 
 			// The cardinal directions below designate the corner of the new 2x2 sub-grid
-			// that contains a "blank" cell (i.e. where the original `x` resided, for an
-			// x-stabilization)
+			// that contains a "blank" cell (i.e. where the original entry resided)
 			if (cardinal == Cardinal::NW || cardinal == Cardinal::SW)
 			{
 				// Insert a blank column to the R of the column in question
@@ -244,41 +245,55 @@ namespace knot
 
 			std::vector<Entry> extra_row(data[0].size(), Entry::BLANK);
 
+			// Stabilization replaces the original entry with a 2x2 sub-grid that will have 
+			// 2 entries of one type, a single entry of the opposite type, and a single blank
+			// cell
+			//
+			// For example, a NW:O stabilization would look like:
+			//
+			//		x---o   x----o
+			//		-----   ----ox
+			//		----x   ------
+			//				----x-
+			//
+			const auto entry_double = original_entry;
+			const auto entry_single = original_entry == Entry::X ? Entry::O : Entry::X;
+
 			switch (cardinal)
 			{
 			case Cardinal::NW:
 			{
 				data[i][j + 0] = Entry::BLANK;
-				data[i][j + 1] = Entry::X;
-				extra_row[j + 0] = Entry::X;
-				extra_row[j + 1] = Entry::O;
+				data[i][j + 1] = entry_double;
+				extra_row[j + 0] = entry_double;
+				extra_row[j + 1] = entry_single;
 				data.insert(data.begin() + i + 1, extra_row);
 				break;
 			}
 			case Cardinal::SW:
 			{
 				data[i][j + 0] = Entry::BLANK;
-				data[i][j + 1] = Entry::X;
-				extra_row[j + 0] = Entry::X;
-				extra_row[j + 1] = Entry::O;
+				data[i][j + 1] = entry_double;
+				extra_row[j + 0] = entry_double;
+				extra_row[j + 1] = entry_single;
 				data.insert(data.begin() + i + 0, extra_row);
 				break;
 			}
 			case Cardinal::NE:
 			{
-				data[i][j + 0] = Entry::X; // Technically, this is unnecessary
+				data[i][j + 0] = entry_double; // Technically, this is unnecessary
 				data[i][j + 1] = Entry::BLANK;
-				extra_row[j + 0] = Entry::O;
-				extra_row[j + 1] = Entry::X;
+				extra_row[j + 0] = entry_single;
+				extra_row[j + 1] = entry_double;
 				data.insert(data.begin() + i + 1, extra_row);
 				break;
 			}
 			case Cardinal::SE:
 			{
-				data[i][j + 0] = Entry::X; // Technically, this is unnecessary
+				data[i][j + 0] = entry_double; // Technically, this is unnecessary
 				data[i][j + 1] = Entry::BLANK;
-				extra_row[j + 0] = Entry::O;
-				extra_row[j + 1] = Entry::X;
+				extra_row[j + 0] = entry_single;
+				extra_row[j + 1] = entry_double;
 				data.insert(data.begin() + i + 0, extra_row);
 				break;
 			}
@@ -286,9 +301,106 @@ namespace knot
 		}
 
 		/// A move that removes ("flattens") a 2x2 sub-grid
-		void apply_destabilization()
+		void apply_destabilization(size_t i, size_t j)
 		{
-			throw std::runtime_error("Unimplemented");
+			if (i >= data.size() - 1 || j >= data.size() - 1)
+			{
+				throw CromwellException("Cannot destabilize at the specified grid position: out of bounds");
+			}
+
+			std::pair<size_t, size_t> index_of_blank;
+
+			const auto ul = data[i + 0][j + 0];
+			const auto ur = data[i + 0][j + 1];
+			const auto ll = data[i + 1][j + 0];
+			const auto lr = data[i + 1][j + 1];
+
+			// Count the number of x's, o's, and blanks in the subgrid whose upper-left 
+			// corner is <i, j>
+			size_t number_of_xs = 0;
+			size_t number_of_os = 0;
+			size_t number_of_blanks = 0;
+			auto cardinal = Cardinal::NW;
+			for (size_t subgrid_i = 0; subgrid_i < 2; ++subgrid_i)
+			{	
+				for (size_t subgrid_j = 0; subgrid_j < 2; ++subgrid_j)
+				{
+					auto entry = data[i + subgrid_i][j + subgrid_j];
+
+					if (entry == Entry::X)
+					{
+						number_of_xs++;
+					}
+					else if (entry == Entry::O)
+					{
+						number_of_os++;
+					}
+					else
+					{
+						number_of_blanks++;
+
+						// Which "corner" of the subgrid does this blank entry reside in?
+						if (subgrid_i == 0 && subgrid_j == 0) cardinal = Cardinal::NW;
+						else if (subgrid_i == 1 && subgrid_j == 0) cardinal = Cardinal::SW;
+						else if (subgrid_i == 0 && subgrid_j == 1) cardinal = Cardinal::NE;
+						else if (subgrid_i == 1 && subgrid_j == 1) cardinal = Cardinal::SE;
+					}
+				}
+			}
+
+			auto entry_double = Entry::X;
+			auto entry_single = Entry::O;
+
+			if (number_of_xs == 2 && number_of_os == 1 && number_of_blanks == 1)
+			{
+			}
+			else if (number_of_xs == 1 && number_of_os == 2 && number_of_blanks == 1)
+			{
+				entry_double = Entry::O;
+				entry_single = Entry::X;
+			}
+			else
+			{
+				throw CromwellException("Trying to destabilize subgrid that doesn't have the appropriate number of x's, o's, and/or blank cells");
+			}
+
+			// Based on the cardinality found above, remove a full col + row from the grid and insert
+			// the new entry at the old "blank" spot
+			switch (cardinal)
+			{
+			case Cardinal::NW:
+				data[i + 0][j + 0] = entry_double;
+				data.erase(data.begin() + i + 1);
+				for (auto& row : data)
+				{
+					row.erase(row.begin() + j + 1);
+				}
+				break;
+			case Cardinal::SW:
+				data[i + 1][j + 0] = entry_double;
+				data.erase(data.begin() + i + 0);			
+				for (auto& row : data)
+				{
+					row.erase(row.begin() + j + 1);
+				}
+				break;
+			case Cardinal::NE:
+				data[i + 0][j + 1] = entry_double;
+				data.erase(data.begin() + i + 1);
+				for (auto& row : data)
+				{
+					row.erase(row.begin() + j + 0);
+				}
+				break;
+			case Cardinal::SE:
+				data[i + 1][j + 1] = entry_double;
+				data.erase(data.begin() + i + 0);
+				for (auto& row : data)
+				{
+					row.erase(row.begin() + j + 0);
+				}
+				break;
+			};
 		}
 
 		/// Returns a reference to this diagram's underlying data store

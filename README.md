@@ -36,8 +36,8 @@ The Cromwell Moves are similar to the [Reidemeister Moves](https://en.wikipedia.
 There are 4 different Cromwell moves:
 1. Translation: a move that cyclically translates a row or column in one of four directions: up, down, left, or right
 2. Commutation: a move that exchanges to adjacent, non-interleaved rows or columns
-3. Stabilization: a move that replaces an `x` with a 2x2 sub-grid
-4. Destabilization: a move that replaces a 2x2 sub-grid with an `x` (the opposite of an x-stabilization): currently not supported
+3. Stabilization: a move that replaces an `x` or `o` with a 2x2 sub-grid
+4. Destabilization: a move that replaces a 2x2 sub-grid with a single `x` or `o` (the opposite of a stabilization)
 
 ## Tested On
 - Windows 10

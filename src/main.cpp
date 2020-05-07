@@ -54,6 +54,8 @@ int commutation_index = 0;
 int stabilization_cardinal = 0;
 int stabilization_index_i = 0;
 int stabilization_index_j = 0;
+int destabilization_index_i = 0;
+int destabilization_index_j = 0;
 
 GLFWwindow* window;
 
@@ -253,10 +255,21 @@ void draw_diagram(const knot::Diagram& diagram)
                     pop_color = true;
                     ImGui::PushStyleColor(ImGuiCol_Button, selected_color);
                 }
-                else if (label == "x")
+                else if (label != " ")
                 {
                     pop_color = true;
                     ImGui::PushStyleColor(ImGuiCol_Button, selectable_color);
+                }
+            }
+            else if (current_move == "Destabilization")
+            {
+                if ((destabilization_index_i == i + 0 && destabilization_index_j == j + 0) ||   // UL
+                    (destabilization_index_i == i - 1 && destabilization_index_j == j + 0) ||   // LL
+                    (destabilization_index_i == i + 0 && destabilization_index_j == j - 1) ||   // UR
+                    (destabilization_index_i == i - 1 && destabilization_index_j == j - 1))     // LR
+                {
+                    pop_color = true;
+                    ImGui::PushStyleColor(ImGuiCol_Button, selected_color);
                 }
             }
 
@@ -751,6 +764,33 @@ int main()
                             stream << utils::to_string(static_cast<knot::Cardinal>(stabilization_cardinal)) << ") on ";
                             stream << "row: " << stabilization_index_i << ", ";
                             stream << "col: " << stabilization_index_j;
+
+                            history.push(stream.str(), utils::MessageType::INFO);
+                        }
+                        catch (knot::CromwellException e)
+                        {
+                            history.push(e.get_message(), utils::MessageType::ERROR);
+                        }
+                    }
+                }
+                else if (current_move == "Destabilization")
+                {
+                    // The indices of the top-left corner of the 2x2 subgrid to destabilize
+                    ImGui::SliderInt("Row Index", &destabilization_index_i, 0, diagram.get_size() - 2);
+                    ImGui::SliderInt("Col Index", &destabilization_index_j, 0, diagram.get_size() - 2);
+
+                    // Run the actual desabilization operation
+                    if (ImGui::Button("Operate"))
+                    {
+                        try
+                        {
+                            diagram.apply_destabilization(destabilization_index_i, destabilization_index_j);
+                            topology_needs_update = true;
+
+                            std::stringstream stream;
+                            stream << "Applied destabilization on subgrid with corner at ";
+                            stream << "row: " << destabilization_index_i << ", ";
+                            stream << "col: " << destabilization_index_j;
 
                             history.push(stream.str(), utils::MessageType::INFO);
                         }
