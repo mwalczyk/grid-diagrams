@@ -26,9 +26,9 @@ void main()
 		float current = projection_space_coordinates.z;
 
 		// Filtering
-		const float bias = 0.015;
+		const float bias = 0.0075;
 		const vec2 texel_size = 1.0 / textureSize(u_depth_map, 0);
-		const int kernel_steps = 12;
+		const int kernel_steps = 20;
 		for(int x = -kernel_steps; x <= kernel_steps; ++x)
 		{
 		    for(int y = -kernel_steps; y <= kernel_steps; ++y)
@@ -42,7 +42,7 @@ void main()
 		shadow /= pow(kernel_steps * 2.0 + 1.0, 2.0);
 
 		// Prevent shadows from being 100% black
-		shadow = min(shadow, 0.3);
+		shadow = min(shadow, 0.6);
 
 		// keep the shadow at 0.0 when outside the far_plane region of the light's frustum.
 	    if(projection_space_coordinates.z > 1.0)

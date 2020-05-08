@@ -40,7 +40,7 @@ glm::mat4 arcball_model_matrix = glm::mat4{ 1.0f };
 bool simulation_active = false;
 
 // Appearance settings
-ImVec4 clear_color = ImVec4(0.208f, 0.256f, 0.373f, 1.0f);
+ImVec4 clear_color = ImVec4(0.311f, 0.320f, 0.343f, 1.0f);
 
 // File paths
 std::vector<std::string> available_csvs;
@@ -879,12 +879,12 @@ int main()
             }
 
             // Setup faux light position, projection matrix, etc.
-            const glm::vec3 light_position{ 0.0f, 0.0f, 10.0f };
-            const float near_plane = 0.0f;
-            const float far_plane = 20.0f;
+            const glm::vec3 light_position{ 1.0f, 1.0f, 1.0f };
+            const float near_plane = -10.0f;
+            const float far_plane = 10.0f;
             const float ortho_width = 20.0f;
             const auto light_projection = glm::ortho(-ortho_width, ortho_width, -ortho_width, ortho_width, near_plane, far_plane);
-            const auto light_view = glm::lookAt(light_position, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
+            const auto light_view = glm::lookAt(light_position, glm::vec3{ 0.0f, 0.0f, 0.0f }, glm::vec3{ 0.0f, 1.0f, 0.0f });
             const auto light_space_matrix = light_projection * light_view;
 
             // Make sure the knot is always centered

@@ -39,6 +39,8 @@ There are 4 different Cromwell moves:
 3. Stabilization: a move that replaces an `x` or `o` with a 2x2 sub-grid
 4. Destabilization: a move that replaces a 2x2 sub-grid with a single `x` or `o` (the opposite of a stabilization)
 
+More information can be found in the following [poster](https://www.math.ucdavis.edu/~slwitte/research/BlackwellTapiaPoster.pdf) titled "Randomly Sampling Grid Diagrams of Knots."
+
 ## Tested On
 - Windows 10
 - NVIDIA GeForce GTX 1660 Ti
