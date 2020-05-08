@@ -1,4 +1,4 @@
-# knots
+# grid diagrams
 ➰ A program for manipulating and playing with knot diagrams.
 
 <p align="center">
