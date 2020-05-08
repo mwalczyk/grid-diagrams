@@ -57,6 +57,7 @@ int stabilization_index_j = 0;
 int destabilization_index_i = 0;
 int destabilization_index_j = 0;
 
+// The main window handle
 GLFWwindow* window;
 
 /**
@@ -150,14 +151,14 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
         {
             const float rotation_speed = 0.25f;
 
-            glm::vec3 va = get_arcball_vector(last_x, last_y);
-            glm::vec3 vb = get_arcball_vector(xpos, ypos);
+            const glm::vec3 va = get_arcball_vector(last_x, last_y);
+            const glm::vec3 vb = get_arcball_vector(xpos, ypos);
             const float angle = acos(std::min(1.0f, glm::dot(va, vb))) * rotation_speed;
             const glm::vec3 axis_camera_coordinates = glm::cross(va, vb);
 
-            glm::mat3 camera_to_object = glm::inverse(glm::mat3(arcball_camera_matrix) * glm::mat3(arcball_model_matrix));
+            const glm::mat3 camera_to_object = glm::inverse(glm::mat3(arcball_camera_matrix) * glm::mat3(arcball_model_matrix));
 
-            glm::vec3 axis_in_object_coord = camera_to_object * axis_camera_coordinates;
+            const glm::vec3 axis_in_object_coord = camera_to_object * axis_camera_coordinates;
 
             arcball_model_matrix = glm::rotate(arcball_model_matrix, glm::degrees(angle), axis_in_object_coord);
 
@@ -178,7 +179,8 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
  */
 void message_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, GLchar const* message, void const* user_param)
 {
-    auto const src_str = [source]() {
+    auto const src_str = [source]() 
+    {
         switch (source)
         {
         case GL_DEBUG_SOURCE_API: return "API";
@@ -190,7 +192,8 @@ void message_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GL
         }
     }();
 
-    auto const type_str = [type]() {
+    auto const type_str = [type]() 
+    {
         switch (type)
         {
         case GL_DEBUG_TYPE_ERROR: return "ERROR";
@@ -203,7 +206,8 @@ void message_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GL
         }
     }();
 
-    auto const severity_str = [severity]() {
+    auto const severity_str = [severity]() 
+    {
         switch (severity) {
         case GL_DEBUG_SEVERITY_NOTIFICATION: return "NOTIFICATION";
         case GL_DEBUG_SEVERITY_LOW: return "LOW";
@@ -212,7 +216,7 @@ void message_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GL
         }
     }();
 
-    std::cout << src_str << ", " << type_str << ", " << severity_str << ", " << id << ": " << message << '\n';
+    std::cout << src_str << ", " << type_str << ", " << severity_str << ", " << id << ": " << message << "\n";
 }
 
 /**
@@ -225,9 +229,9 @@ void draw_diagram(const knot::Diagram& diagram)
     const auto text_size = ImGui::CalcTextSize("x");
     const auto button_dims = std::max(text_size.x, text_size.y) * 2;
 
-    for (size_t i = 0; i < diagram.get_size(); i++)
+    for (size_t i = 0; i < diagram.get_size(); ++i)
     {
-        for (size_t j = 0; j < diagram.get_size(); j++)
+        for (size_t j = 0; j < diagram.get_size(); ++j)
         {
             std::string label = utils::to_string(diagram.get_data()[i][j]);
             
@@ -238,6 +242,7 @@ void draw_diagram(const knot::Diagram& diagram)
             selectable_color.y *= 0.75f;
             selectable_color.z *= 0.75f;
             const auto selected_color = ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered];
+
             if (current_move == "Commutation")
             {
                 ImGui::GetColorU32(ImGuiCol_ButtonHovered);
@@ -283,10 +288,8 @@ void draw_diagram(const knot::Diagram& diagram)
                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0.0f, ImGui::GetStyle().ItemSpacing.y });
             }
 
-            if (ImGui::Button(label.c_str(), { button_dims, button_dims }))
-            {
-                std::cout << "Pressed" << std::endl;
-            }
+            // Finally, draw the button
+            ImGui::Button(label.c_str(), { button_dims, button_dims });
 
             if (pop_color)
             {
@@ -300,15 +303,6 @@ void draw_diagram(const knot::Diagram& diagram)
 
             ImGui::PopStyleVar();
 
-        }
-    }
-
-    // Check input
-    if (ImGui::IsItemHovered()) 
-    {
-        if (ImGui::IsMouseClicked(0)) 
-        {
-           const auto mouse_position = ImGui::GetMousePos();
         }
     }
 }
@@ -325,7 +319,7 @@ void initialize()
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_RESIZABLE, false);
     glfwWindowHint(GLFW_SAMPLES, 4);
-    window = glfwCreateWindow(window_w, window_h, "Marching Cubes", nullptr, nullptr);
+    window = glfwCreateWindow(window_w, window_h, "Grid Diagrams for Knots", nullptr, nullptr);
 
     if (window == nullptr)
     {
@@ -549,6 +543,7 @@ int main()
 
         // Draw the UI elements (buttons, sliders, etc.)
         {
+            // If this flag gets set by any of the UI elements below, the knot will be rebuilt
             bool topology_needs_update = false;
 
             // Basic settings UI window
@@ -569,6 +564,7 @@ int main()
 
                         if (ImGui::Selectable(available_csvs[i].c_str(), is_selected))
                         {
+                            // If the .csv selection has changed, load a new diagram
                             current_csv = available_csvs[i];
                             diagram = knot::Diagram{ current_csv };
 
@@ -827,7 +823,6 @@ int main()
                 ImGui::End();
             }
         }
-        
         ImGui::Render();
         
         // Render 3D objects to UI (offscreen) framebuffer

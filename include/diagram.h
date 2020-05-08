@@ -353,6 +353,7 @@ namespace knot
 
 			if (number_of_xs == 2 && number_of_os == 1 && number_of_blanks == 1)
 			{
+				// Placeholder
 			}
 			else if (number_of_xs == 1 && number_of_os == 2 && number_of_blanks == 1)
 			{
