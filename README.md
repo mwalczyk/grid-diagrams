@@ -80,7 +80,7 @@ New diagrams can be added to the `diagrams` folder at the top-level of this repo
 - [ ] Add polyline refinement algorithm(s)
 - [ ] Abstract and clean-up the VAO/VBO stuff using RAII
 
-### Future Directions
+## Future Directions
 
 Converting grid diagrams into 3D curves is not something that I came across directly in my research. Although my method of "lifting" the curve at each of the crossings works, it seems rather "hacky." An alternate representation uses [cube diagrams](https://www.researchgate.net/publication/45865147_Small_examples_of_cube_diagrams_of_knots), which are inherently 3D, and therefore, would always start in a valid configuration. Unfortunately, I wasn't able to find nearly as much information about cube diagrams in my research, so for now, I leave that as an open topic of research.
 
