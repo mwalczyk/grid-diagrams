@@ -2,7 +2,7 @@
 ➰ A program for manipulating and playing with knot diagrams.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/mwalczyk/grid-diagrams/master/screenshots/screenshot.png" alt="screenshot" width="400" height="auto"/>
+  <img src="https://raw.githubusercontent.com/mwalczyk/grid-diagrams/master/screenshots/screenshot.gif" alt="screenshot" width="400" height="auto"/>
 </p>
 
 ## Description
@@ -19,11 +19,11 @@ In practice, we can traverse the diagram by starting with the `x` in the left-mo
 
 ### Refinement
 
-Following the procedure outlined above results in a piecewise linear link (polyline). To obtain a "smoother" projection of the knot (one without sharp corners), we need to perform some form of topological refinement, taking care to not change the underlying structure of the knot. Following Dr. Scharein's thesis (link below), each vertex of the polyline is treated as a particle in a physics simulation. Adjacent particles are attracted to one another via a mechanical spring force. Non-adjacent particles are repelled from one another via an electrostatic force, which (in practice) prevents segments from crossing over or under one another. Additionally, we perform intersection tests between all pairs of non-neighboring line segments to prevent any "illegal" crossings. This is why we "lift" vertices at all of the crossings when we pre-process the grid diagram.
-
 <p align="center">
   <img src="https://raw.githubusercontent.com/mwalczyk/grid-diagrams/master/screenshots/unwinding.gif" alt="screenshot" width="400" height="auto"/>
 </p>
+
+Following the procedure outlined above results in a piecewise linear link (polyline). To obtain a "smoother" projection of the knot (one without sharp corners), we need to perform some form of topological refinement, taking care to not change the underlying structure of the knot. Following Dr. Scharein's thesis (link below), each vertex of the polyline is treated as a particle in a physics simulation. Adjacent particles are attracted to one another via a mechanical spring force. Non-adjacent particles are repelled from one another via an electrostatic force, which (in practice) prevents segments from crossing over or under one another. Additionally, we perform intersection tests between all pairs of non-neighboring line segments to prevent any "illegal" crossings. This is why we "lift" vertices at all of the crossings when we pre-process the grid diagram.
 
 The relaxation is fairly dependent on both the settings of the simulation parameters as well as the density of the underlying polygonal curve. One TODO item is to investigate more robust ways of resampling a polyline.
 
@@ -84,7 +84,13 @@ New diagrams can be added to the `diagrams` folder at the top-level of this repo
 
 Converting grid diagrams into 3D curves is not something that I came across directly in my research. Although my method of "lifting" the curve at each of the crossings works, it seems rather "hacky." An alternate representation uses [cube diagrams](https://www.researchgate.net/publication/45865147_Small_examples_of_cube_diagrams_of_knots), which are inherently 3D, and therefore, would always start in a valid configuration. Unfortunately, I wasn't able to find nearly as much information about cube diagrams in my research, so for now, I leave that as an open topic of research.
 
-One interesting area of study in the field of knot theory is that of random knot generation. This turns out to be quite a challenging problem. How do we generate a curve that is *actually* knotted? Moreover, how do we *prove* that it is, in fact, knotted? [Dr. Jason Cantarella](http://www.jasoncantarella.com/wordpress/) has done significant research into this topic, which I would love to explore. Early on, I created a "naive" algorithm for randomly generating grid diagrams, but the vast majority of these diagrams resulted in the unknot (or knots with more than one component). This observation prompted me to explore this problem further.
+One interesting area of study in the field of knot theory is that of random knot generation. This turns out to be quite a challenging problem. How do we generate a curve that is *actually* knotted? Moreover, how do we *prove* that it is, in fact, knotted? [Dr. Jason Cantarella](http://www.jasoncantarella.com/wordpress/) has done significant research into this topic, which I would love to explore. Early on, I created a "naive" algorithm for randomly generating grid diagrams, but the vast majority of these diagrams resulted in the unknot (or knots with more than one component). Some of the randomized diagrams output from that program are shown below. This observation prompted me to explore this problem further.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/mwalczyk/grid-diagrams/master/screenshots/many_knots.png" alt="screenshot" width="200" height="auto"/>
+  <img src="https://raw.githubusercontent.com/mwalczyk/grid-diagrams/master/screenshots/many_knots_smooth.png" alt="screenshot" width="200" height="auto"/>
+</p>
+
 
 Fundamental to the problem of random knot generation is representation. More specifically, what are all of the different ways that we can represent knots (mathematically, or otherwise)? Clearly, grid diagrams and cube diagrams are two forms of representation, but there are others. One interesting algorithm is the so-called [hedgehog method](https://link.springer.com/article/10.1007/s10955-011-0164-4), which produces random, closed polygonal curves. Some examples of curves generated via my (naive) implementation of the hedgehog method are shown below. Knots can also be represented as planar graphs, which leads to the question: how can we generate random, 4-valent planar graphs? My initial research yielded [blossom trees](https://en.wikipedia.org/wiki/Blossom_tree_(graph_theory)), which are essentially trees with additional edges that are used to form closed loops in the graph. Blossom trees can be used to sample random planar graphs.
 
@@ -95,7 +101,7 @@ Fundamental to the problem of random knot generation is representation. More spe
 Beyond this, there are also other ways to catalog and diagram knots: Dowker codes, Conway notation, Gauss codes, braid representations, among others. Dr. Scharein (mentioned below) implemented a "tangle calculator" for building knots from small, molecular components called "tangles." He also implemented a tool for "drawing" knots by hand, which is something that I explored as well. One challenge with such a tool is: how does the user specify under-/over-crossings? In the prototype that I created (shown below), the crossings would simply alternate whenever the user crossed an existing strand. There is a lot to explore here as well!
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/mwalczyk/grid-diagrams/master/screenshots/drawing.png" alt="screenshot" width="400" height="auto"/>
+  <img src="https://raw.githubusercontent.com/mwalczyk/grid-diagrams/master/screenshots/drawing.gif" alt="screenshot" width="400" height="auto"/>
 </p>
 
 Finally, the pseudo-physical simulation used in this program is just one way to perform topological refinement. Dr. Cantarella has also explored this topic with his ["ridgerunner"](http://www.jasoncantarella.com/wordpress/software/ridgerunner/) software, which can "tighten" a knot via a form of constrained gradient descent. Are there other ways to accurately "relax" knots? 
